@@ -1,0 +1,95 @@
+name: CI/CD Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [ closed ]
+
+jobs:
+  ETHOBITES-WEB:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'push' || (github.event.pull_request.merged == true)
+    
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Create environment file
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+        run: |
+          echo "$ENV_FILE_CONTENT" > .env.local
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type check
+        run: npm run type-check
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Build application
+        run: npm run build
+
+      - name: Build Docker image
+        run: docker build -t ethobites-web-app .
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Tag Docker image
+        run: |
+          docker tag ethobites-web-app registry.digitalocean.com/ethioclicks-container/ethobites-web-app:latest
+          docker tag ethobites-web-app registry.digitalocean.com/ethioclicks-container/ethobites-web-app:${{ github.sha }}
+
+      - name: Push Docker image to Container Registry
+        run: |
+          docker push registry.digitalocean.com/ethioclicks-container/ethobites-web-app:latest
+          docker push registry.digitalocean.com/ethioclicks-container/ethobites-web-app:${{ github.sha }}
+
+      - name: Deploy to DigitalOcean Droplet (Production)
+        if: github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USERNAME }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          port: ${{ secrets.PRODUCTION_PORT }}
+          script: |
+            doctl registry login --expiry-seconds 600
+            docker pull registry.digitalocean.com/ethioclicks-container/ethobites-web-app:latest
+            docker stop ethobites-web-app || true
+            docker rm ethobites-web-app || true
+            docker run -d \
+              --name ethobites-web-app \
+              --restart unless-stopped \
+              -p 3001:3000 \
+              --env-file /opt/ethobites-web/.env.production \
+              --health-cmd "curl -f http://localhost:3000/api/health || exit 1" \
+              --health-interval 30s \
+              --health-timeout 10s \
+              --health-retries 3 \
+              registry.digitalocean.com/ethioclicks-container/ethobites-web-app:latest
+            docker images registry.digitalocean.com/ethioclicks-container/ethobites-web-app --format "table {{.Tag}}\t{{.ID}}" | \
+              grep -v "latest" | \
+              tail -n +4 | \
+              awk '{print $2}' | \
+              xargs -r docker rmi || true
+            sleep 30
+            curl -f http://localhost:3001/api/health || exit 1
+            echo "✅ EthoBites Web App deployed successfully!"
