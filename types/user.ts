@@ -44,6 +44,7 @@ export interface UserProfileModel {
   isEmailVerified?: boolean;
   roles?: Role[];
   userDeviceId?: string;
+  createdAt?: string;
 }
 
 export interface AuthenticationRequest {
