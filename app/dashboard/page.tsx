@@ -12,7 +12,7 @@ import { getUserProfile } from '@/lib/api/profile';
 import { UserProfileModel } from '@/types/user';
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<UserDetail | null>(null);
+  const [profile, setProfile] = useState<UserProfileModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { data: session, status } = useSession();
   const router = useRouter();

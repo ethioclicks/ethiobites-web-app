@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import MainNavigation from '@/components/navigation/MainNavigation';
 import Loading from '@/components/ui/Loading';
 
@@ -211,6 +211,7 @@ function SidebarNavItem({
   badge 
 }: SidebarNavItemProps) {
   const router = useRouter();
+  const pathname = usePathname();
   
   const handleClick = () => {
     if (disabled) return;
@@ -222,7 +223,7 @@ function SidebarNavItem({
     }
   };
 
-  const isActive = href ? router.pathname === href : false;
+  const isActive = href ? pathname === href : false;
 
   return (
     <button

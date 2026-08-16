@@ -44,7 +44,7 @@ function ResetPasswordForm() {
       
       if (result.valid) {
         setIsValidToken(true);
-        setEmail(result.email);
+        setEmail(result.phoneNumber);
       } else {
         setErrors({ token: 'This reset link has expired. Please request a new password reset.' });
       }

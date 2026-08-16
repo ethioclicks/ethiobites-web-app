@@ -18,13 +18,12 @@ import {
   updateProfilePicture,
   changePassword,
   validateProfileData,
-  UpdateProfilePayload,
-  ChangePasswordPayload 
+  UpdateProfilePayload
 } from '@/lib/api/profile';
 import { UserProfileModel, UserAddress } from '@/types/user';
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserDetail | null>(null);
+  const [profile, setProfile] = useState<UserProfileModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,10 +38,7 @@ export default function ProfilePage() {
     address: { street: '', city: '' },
   });
 
-  const [passwordData, setPasswordData] = useState<ChangePasswordPayload>({
-    currentPassword: '',
-    newPassword: '',
-  });
+  const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '' });
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const { data: session, status } = useSession();
@@ -82,7 +78,7 @@ export default function ProfilePage() {
         lastName: profileData.lastName || '',
         email: profileData.email || '',
         address: profileData.address || { street: '', city: '' },
-        profilePicture: profileData.profilePicture,
+        thumbnail: profileData.thumbnail,
       });
     } catch (error: any) {
       console.error('Failed to load profile:', error);
@@ -101,7 +97,7 @@ export default function ProfilePage() {
           lastName: profile.lastName || '',
           email: profile.email || '',
           address: profile.address || { street: '', city: '' },
-          profilePicture: profile.profilePicture,
+          thumbnail: profile.thumbnail,
         });
       }
       setErrors({});
@@ -136,7 +132,7 @@ export default function ProfilePage() {
     try {
       const updatedProfile = await updateProfilePicture(imageUrl);
       setProfile(updatedProfile);
-      setEditData(prev => ({ ...prev, profilePicture: imageUrl }));
+      setEditData(prev => ({ ...prev, thumbnail: imageUrl }));
       setSuccessMessage('Profile picture updated successfully!');
     } catch (error: any) {
       console.error('Failed to update profile picture:', error);
@@ -292,7 +288,7 @@ export default function ProfilePage() {
           {/* Profile Picture Section */}
           <div className="text-center mb-8">
             <ProfilePictureUpload
-              currentImage={profile.profilePicture}
+              currentImage={profile.thumbnail}
               onImageUploaded={handleProfilePictureUpload}
               disabled={!isEditing}
             />

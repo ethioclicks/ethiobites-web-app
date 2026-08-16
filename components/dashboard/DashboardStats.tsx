@@ -5,7 +5,7 @@ import Card from '@/components/ui/Card';
 import { UserProfileModel } from '@/types/user';
 
 interface DashboardStatsProps {
-  profile?: UserDetail | null;
+  profile?: UserProfileModel | null;
 }
 
 interface StatItem {
