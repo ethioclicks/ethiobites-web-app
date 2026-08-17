@@ -87,9 +87,21 @@ function LoginForm() {
       if (result?.error) {
         setError(result.error);
       } else if (result?.ok) {
-        // Successful login - NextAuth will handle the redirect
-        const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
-        router.push(callbackUrl);
+        // Fetch session to check roles for redirect
+        const callbackUrl = searchParams.get('callbackUrl');
+        if (callbackUrl) {
+          router.push(callbackUrl);
+        } else {
+          // Check if user is admin by fetching the updated session
+          const res = await fetch('/api/auth/session');
+          const sessionData = await res.json();
+          const roles = sessionData?.roles || [];
+          if (roles.includes('ADMIN')) {
+            router.push('/admin-dashboard');
+          } else {
+            router.push('/dashboard');
+          }
+        }
       } else {
         setError('An unexpected error occurred. Please try again.');
       }

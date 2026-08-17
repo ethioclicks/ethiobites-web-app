@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({ variant = 'default', showAuth = true })
       <Container>
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href={isAuthenticated ? "/dashboard" : "/"} className="flex items-center space-x-2">
+          <Link href={isAuthenticated ? (session?.roles?.includes('ADMIN') ? '/admin-dashboard' : '/dashboard') : "/"} className="flex items-center space-x-2">
             <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">E</span>
             </div>
@@ -68,7 +68,7 @@ const Header: React.FC<HeaderProps> = ({ variant = 'default', showAuth = true })
             {isAuthenticated && (
               <>
                 <Link 
-                  href="/dashboard" 
+                  href={session?.roles?.includes('ADMIN') ? '/admin-dashboard' : '/dashboard'}
                   className="text-text-secondary hover:text-primary-500 transition-colors"
                 >
                   Dashboard
@@ -181,7 +181,7 @@ const Header: React.FC<HeaderProps> = ({ variant = 'default', showAuth = true })
               {isAuthenticated && (
                 <>
                   <Link 
-                    href="/dashboard"
+                    href={session?.roles?.includes('ADMIN') ? '/admin-dashboard' : '/dashboard'}
                     className="text-text-secondary hover:text-primary-500 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
