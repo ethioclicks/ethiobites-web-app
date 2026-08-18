@@ -15,6 +15,62 @@ import { getUserRestaurants } from '@/lib/api/restaurant';
 import RestaurantCard from '@/components/restaurant/RestaurantCard';
 import SubscriptionModal from '@/components/subscription/SubscriptionModal';
 
+// Component to handle device-specific mobile app links
+function MobileAppButton() {
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent;
+    setIsIOS(/iPad|iPhone|iPod/.test(userAgent));
+  }, []);
+
+  const appUrl = isIOS 
+    ? "https://apps.apple.com/us/app/ethio-bites/id6751940813"
+    : "https://play.google.com/store/apps/details?id=com.ethioclicks.esoora_restaurant_view";
+
+  return (
+    <a 
+      href={appUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors inline-flex items-center"
+    >
+      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      </svg>
+      Add Restaurant (Mobile App)
+    </a>
+  );
+}
+
+// Component for download link in empty state
+function MobileAppDownloadLink() {
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent;
+    setIsIOS(/iPad|iPhone|iPod/.test(userAgent));
+  }, []);
+
+  const appUrl = isIOS 
+    ? "https://apps.apple.com/us/app/ethio-bites/id6751940813"
+    : "https://play.google.com/store/apps/details?id=com.ethioclicks.esoora_restaurant_view";
+
+  return (
+    <a 
+      href={appUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center text-primary-600 hover:text-primary-700 font-medium"
+    >
+      Download EthioBites App
+      <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+      </svg>
+    </a>
+  );
+}
+
 export default function Dashboard() {
   const [profile, setProfile] = useState<UserProfileModel | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -129,7 +185,7 @@ export default function Dashboard() {
                     </p>
                     <div className="flex flex-wrap gap-4">
                       <a 
-                        href="https://play.google.com/store/apps/details?id=com.ethiobites"
+                        href="https://play.google.com/store/apps/details?id=com.ethioclicks.esoora_restaurant_view"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
@@ -140,7 +196,7 @@ export default function Dashboard() {
                         Google Play
                       </a>
                       <a 
-                        href="https://apps.apple.com/app/ethiobites"
+                        href="https://apps.apple.com/us/app/ethio-bites/id6751940813"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
@@ -168,17 +224,7 @@ export default function Dashboard() {
           <div className="mb-8">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-semibold text-text-primary">Your Restaurants</h2>
-              <a 
-                href="https://play.google.com/store/apps/details?id=com.ethiobites" 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors inline-flex items-center"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add Restaurant (Mobile App)
-              </a>
+              <MobileAppButton />
             </div>
 
             {restaurantsLoading ? (
@@ -210,7 +256,7 @@ export default function Dashboard() {
                   Use our mobile app to register your first restaurant and start managing your business.
                 </p>
                 <a 
-                  href="https://play.google.com/store/apps/details?id=com.ethiobites"
+                  href="https://play.google.com/store/apps/details?id=com.ethioclicks.esoora_restaurant_view"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center text-primary-600 hover:text-primary-700 font-medium"
