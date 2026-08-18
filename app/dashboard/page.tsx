@@ -13,7 +13,6 @@ import { UserProfileModel } from '@/types/user';
 import { Restaurant } from '@/types/restaurant';
 import { getUserRestaurants } from '@/lib/api/restaurant';
 import RestaurantCard from '@/components/restaurant/RestaurantCard';
-import SubscriptionModal from '@/components/subscription/SubscriptionModal';
 
 // Component to handle device-specific mobile app links
 function MobileAppButton() {
@@ -76,8 +75,6 @@ export default function Dashboard() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -237,10 +234,7 @@ export default function Dashboard() {
                   <RestaurantCard
                     key={restaurant.id}
                     restaurant={restaurant}
-                    onManageSubscription={(restaurant) => {
-                      setSelectedRestaurant(restaurant);
-                      setShowSubscriptionModal(true);
-                    }}
+                    onManageSubscription={() => {}} // No longer needed since we use navigation
                   />
                 ))}
               </div>
@@ -309,21 +303,6 @@ export default function Dashboard() {
           </div>
         </div>
       </Container>
-
-      {/* Subscription Modal */}
-      {showSubscriptionModal && selectedRestaurant && (
-        <SubscriptionModal
-          restaurant={selectedRestaurant}
-          isOpen={showSubscriptionModal}
-          onClose={() => {
-            setShowSubscriptionModal(false);
-            setSelectedRestaurant(null);
-          }}
-          onSuccess={() => {
-            loadUserRestaurants();
-          }}
-        />
-      )}
     </>
   );
 }

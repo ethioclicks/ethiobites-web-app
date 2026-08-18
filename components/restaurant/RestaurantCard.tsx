@@ -198,7 +198,8 @@ export default function RestaurantCard({
         {/* Actions */}
         {showActions && (
           <div className="space-y-2">
-            {restaurant.id ? (
+            {/* Manage Restaurant Button - Hidden for now */}
+            {/* {restaurant.id ? (
               <a
                 href={`/restaurant/${restaurant.id}`}
                 className="w-full bg-gray-900 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-gray-800 transition-colors text-center block"
@@ -209,14 +210,14 @@ export default function RestaurantCard({
               <span className="w-full bg-gray-400 text-white py-2.5 px-4 rounded-lg font-medium text-center block cursor-not-allowed">
                 Manage Restaurant
               </span>
-            )}
+            )} */}
             
-            <button
-              onClick={() => onManageSubscription(restaurant)}
-              className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+            <a
+              href={`/subscription?restaurant=${restaurant.id}`}
+              className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors text-center block"
             >
               {(restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > new Date()) || restaurant.isActive ? 'Manage Subscription' : 'Subscribe Now'}
-            </button>
+            </a>
 
             {/* Quick stats for owners */}
             <div className="flex justify-between items-center pt-2 text-xs text-gray-500 border-t">

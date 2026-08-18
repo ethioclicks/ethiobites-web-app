@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Container from '@/components/layout/Container';
 import Card from '@/components/ui/Card';
@@ -18,7 +18,7 @@ const BILLING_CYCLES = [
   { value: 'YEARLY', label: 'Yearly (12 months)' },
 ];
 
-export default function SubscriptionPage() {
+function SubscriptionContent() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +32,8 @@ export default function SubscriptionPage() {
   const [error, setError] = useState('');
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const restaurantId = searchParams.get('restaurant');
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/login?callbackUrl=/subscription');
@@ -96,9 +98,28 @@ export default function SubscriptionPage() {
       <Header />
       <Container>
         <div className="max-w-5xl mx-auto py-8">
+          {/* Back to Dashboard Button */}
+          {restaurantId && (
+            <div className="mb-6">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="inline-flex items-center text-primary-600 hover:text-primary-700 font-medium"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Dashboard
+              </button>
+            </div>
+          )}
+
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Choose Your Plan</h1>
-            <p className="text-text-secondary">Select the plan that best fits your business needs</p>
+            <h1 className="text-3xl font-bold text-text-primary mb-2">
+              {restaurantId ? 'Restaurant Subscription Management' : 'Choose Your Plan'}
+            </h1>
+            <p className="text-text-secondary">
+              {restaurantId ? 'Manage subscription for your restaurant' : 'Select the plan that best fits your business needs'}
+            </p>
           </div>
 
           {success && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 text-sm mb-6 text-center">{success}</div>}
@@ -216,5 +237,22 @@ export default function SubscriptionPage() {
         </Modal>
       </Container>
     </>
+  );
+}
+
+export default function SubscriptionPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Header />
+        <Container>
+          <div className="flex justify-center items-center min-h-[400px]">
+            <Loading size="lg" />
+          </div>
+        </Container>
+      </>
+    }>
+      <SubscriptionContent />
+    </Suspense>
   );
 }
