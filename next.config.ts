@@ -34,9 +34,6 @@ const nextConfig: NextConfig = {
   // Compression
   compress: true,
   
-  // Enable standalone output for Docker
-  output: 'standalone',
-  
   // Turbopack configuration for Next.js 16
   turbopack: {},
   
