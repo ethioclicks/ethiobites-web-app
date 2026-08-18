@@ -64,10 +64,10 @@ export default function Dashboard() {
     
     try {
       setRestaurantsLoading(true);
+      
       const response = await getUserRestaurants({ 
         page: 0, 
-        size: 10, 
-        sort: 'clicks,desc' 
+        size: 10
       });
       
       setRestaurants(response.content || []);

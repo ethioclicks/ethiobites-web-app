@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
+  // Disable experimental features that cause strict typing
+  experimental: {
+    typedRoutes: false,
+  },
+  
   // Optimize images
   images: {
     formats: ['image/webp', 'image/avif'],
@@ -27,6 +32,14 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com', // GitHub profile images
+      },
+      {
+        protocol: 'https',
+        hostname: 'wvveitdbktlvigdsxscd.supabase.co', // Supabase storage for restaurant images
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co', // Allow any Supabase subdomain
       },
     ],
   },

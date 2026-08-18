@@ -13,16 +13,16 @@ export interface RestaurantSearchParams {
  */
 export async function getUserRestaurants(params: RestaurantSearchParams = {}): Promise<RestaurantResponse> {
   try {
-    const response = await apiClient.get<RestaurantResponse>('/restaurant/all-restaurants-by-user', {
+    // Use the confirmed working endpoint
+    const response = await apiClient.get<RestaurantResponse>('/user/restaurants/by-user', {
       params: {
         page: params.page || 0,
         size: params.size || 10,
-        sort: params.sort || 'clicks,desc',
-        name: params.name || ''
+        ...(params.name && { name: params.name })
       }
     });
-    
     return response.data;
+    
   } catch (error: any) {
     console.error('Failed to fetch user restaurants:', error);
     throw new Error(error.response?.data?.message || 'Failed to fetch restaurants');
