@@ -10,6 +10,8 @@ import Button from '@/components/ui/Button';
 import Loading from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
 import { getActivePlans, getMySubscription, subscribe, Plan, Subscription } from '@/lib/api/subscription';
+import { getRestaurantByPublicId } from '@/lib/api/restaurant';
+import { Restaurant } from '@/types/restaurant';
 
 const BILLING_CYCLES = [
   { value: 'MONTHLY', label: 'Monthly' },
@@ -21,6 +23,7 @@ const BILLING_CYCLES = [
 function SubscriptionContent() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -33,7 +36,7 @@ function SubscriptionContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const restaurantId = searchParams.get('restaurant');
+  const restaurantParam = searchParams.get('restaurant'); // This is now expected to be a public ID
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/auth/login?callbackUrl=/subscription');
@@ -47,11 +50,27 @@ function SubscriptionContent() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [plansData, subData] = await Promise.all([getActivePlans(), getMySubscription()]);
-      setPlans(plansData);
-      setCurrentSubscription(subData);
+      setError('');
+      
+      // Load plans and subscription in parallel
+      const promises: Promise<any>[] = [getActivePlans(), getMySubscription()];
+      
+      // If we have a restaurant parameter, fetch restaurant details
+      if (restaurantParam) {
+        promises.push(getRestaurantByPublicId(restaurantParam));
+      }
+      
+      const results = await Promise.all(promises);
+      setPlans(results[0]);
+      setCurrentSubscription(results[1]);
+      
+      // Set restaurant if we fetched it
+      if (restaurantParam && results[2]) {
+        setRestaurant(results[2]);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load plans');
+      console.error('Error loading data:', err);
+      setError(err.message || 'Failed to load data');
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +118,7 @@ function SubscriptionContent() {
       <Container>
         <div className="max-w-5xl mx-auto py-8">
           {/* Back to Dashboard Button */}
-          {restaurantId && (
+          {restaurantParam && (
             <div className="mb-6">
               <button
                 onClick={() => router.push('/dashboard')}
@@ -113,12 +132,35 @@ function SubscriptionContent() {
             </div>
           )}
 
+          {/* Restaurant Info (if viewing specific restaurant) */}
+          {restaurant && (
+            <Card className="p-4 mb-6 border-blue-200 bg-blue-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-blue-700">Managing subscription for:</h2>
+                  <p className="text-lg font-bold text-blue-900">{restaurant.name}</p>
+                  <p className="text-sm text-blue-600">Restaurant ID: {restaurantParam}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-blue-600">
+                    Status: {restaurant.restaurantStatus}
+                  </p>
+                  {restaurant.subscriptionEndDate && (
+                    <p className="text-sm text-blue-600">
+                      Expires: {new Date(restaurant.subscriptionEndDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-text-primary mb-2">
-              {restaurantId ? 'Restaurant Subscription Management' : 'Choose Your Plan'}
+              {restaurantParam ? 'Restaurant Subscription Management' : 'Choose Your Plan'}
             </h1>
             <p className="text-text-secondary">
-              {restaurantId ? 'Manage subscription for your restaurant' : 'Select the plan that best fits your business needs'}
+              {restaurantParam ? 'Manage subscription for your restaurant' : 'Select the plan that best fits your business needs'}
             </p>
           </div>
 

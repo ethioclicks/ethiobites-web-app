@@ -213,7 +213,7 @@ export default function RestaurantCard({
             )} */}
             
             <a
-              href={`/subscription?restaurant=${restaurant.id}`}
+              href={`/subscription?restaurant=${restaurant.restaurantPublicId || restaurant.id}`}
               className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors text-center block"
             >
               {(restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > new Date()) || restaurant.isActive ? 'Manage Subscription' : 'Subscribe Now'}
@@ -222,7 +222,7 @@ export default function RestaurantCard({
             {/* Quick stats for owners */}
             <div className="flex justify-between items-center pt-2 text-xs text-gray-500 border-t">
               <span>Owner: {(restaurant.createdBy || restaurant.owner)?.firstName} {(restaurant.createdBy || restaurant.owner)?.lastName}</span>
-              <span>ID: {restaurant.id}</span>
+              <span>ID: {restaurant.restaurantPublicId || restaurant.id}</span>
             </div>
           </div>
         )}

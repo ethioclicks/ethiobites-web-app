@@ -66,6 +66,7 @@ export interface Menu {
 export interface Restaurant {
     id: number | null;
     name: string;
+    restaurantPublicId?: string; // UUID for external use
     tag: string;
     description: string;
     registerDate: string;

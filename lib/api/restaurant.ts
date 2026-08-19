@@ -43,6 +43,19 @@ export async function getRestaurant(id: number): Promise<Restaurant> {
 }
 
 /**
+ * Get a specific restaurant by public ID (UUID)
+ */
+export async function getRestaurantByPublicId(publicId: string): Promise<Restaurant> {
+  try {
+    const response = await apiClient.get<Restaurant>(`/user/restaurants/by-public-id/${publicId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('Failed to fetch restaurant by public ID:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch restaurant');
+  }
+}
+
+/**
  * Update restaurant status (activate/deactivate)
  */
 export async function updateRestaurantStatus(id: number, isActive: boolean): Promise<Restaurant> {
