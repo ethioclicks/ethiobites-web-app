@@ -12,6 +12,7 @@ import Loading from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
 import {
   getAdminPlans, createPlan, updatePlan, getFeatures, setPlanPricing,
+  updatePlanPricing, deletePlanPricing,
   Plan, Feature, PlanPricing
 } from '@/lib/api/subscription';
 
@@ -28,11 +29,15 @@ export default function AdminPlansPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [selectedPlanForPricing, setSelectedPlanForPricing] = useState<Plan | null>(null);
+  const [editingPricing, setEditingPricing] = useState<PlanPricing | null>(null);
+  const [deletingPricing, setDeletingPricing] = useState<PlanPricing | null>(null);
   const [planForm, setPlanForm] = useState({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] as number[] });
   const [pricingForm, setPricingForm] = useState({ billingCycle: 'MONTHLY', price: '', currency: 'ETB' });
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -82,15 +87,50 @@ export default function AdminPlansPage() {
   const handleSavePricing = async () => {
     if (!selectedPlanForPricing?.id) return;
     try {
-      await setPlanPricing(selectedPlanForPricing.id, {
+      setError('');
+      const pricingData = {
         billingCycle: pricingForm.billingCycle as any,
         price: parseFloat(pricingForm.price),
         currency: pricingForm.currency,
-      });
+      };
+      
+      if (editingPricing?.id) {
+        // Update existing pricing
+        await updatePlanPricing(editingPricing.id, pricingData);
+        setSuccessMessage('Pricing updated successfully!');
+      } else {
+        // Create new pricing
+        await setPlanPricing(selectedPlanForPricing.id, pricingData);
+        setSuccessMessage('Pricing added successfully!');
+      }
+      
       setShowPricingModal(false);
+      setEditingPricing(null);
       loadData();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to save pricing');
+    }
+  };
+
+  const handleDeletePricing = async () => {
+    if (!deletingPricing?.id) return;
+    try {
+      setError('');
+      await deletePlanPricing(deletingPricing.id);
+      setShowDeleteConfirm(false);
+      setDeletingPricing(null);
+      setSuccessMessage('Pricing deleted successfully!');
+      loadData();
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete pricing');
+      setShowDeleteConfirm(false);
+      setDeletingPricing(null);
     }
   };
 
@@ -108,8 +148,25 @@ export default function AdminPlansPage() {
 
   const openPricing = (plan: Plan) => {
     setSelectedPlanForPricing(plan);
+    setEditingPricing(null);
     setPricingForm({ billingCycle: 'MONTHLY', price: '', currency: 'ETB' });
     setShowPricingModal(true);
+  };
+
+  const openEditPricing = (plan: Plan, pricing: PlanPricing) => {
+    setSelectedPlanForPricing(plan);
+    setEditingPricing(pricing);
+    setPricingForm({
+      billingCycle: pricing.billingCycle,
+      price: pricing.price.toString(),
+      currency: pricing.currency,
+    });
+    setShowPricingModal(true);
+  };
+
+  const openDeletePricing = (pricing: PlanPricing) => {
+    setDeletingPricing(pricing);
+    setShowDeleteConfirm(true);
   };
 
   if (status === 'loading' || isLoading) {
@@ -132,6 +189,7 @@ export default function AdminPlansPage() {
           </div>
 
           {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-6">{error}</div>}
+          {successMessage && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 text-sm mb-6">{successMessage}</div>}
 
           <div className="space-y-6">
             {plans.map((plan) => (
@@ -147,7 +205,7 @@ export default function AdminPlansPage() {
                     <p className="text-sm text-text-secondary mt-1">{plan.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => openPricing(plan)}>Set Pricing</Button>
+                    <Button variant="outline" size="sm" onClick={() => openPricing(plan)}>Add Pricing</Button>
                     <Button variant="outline" size="sm" onClick={() => openEditPlan(plan)}>Edit</Button>
                   </div>
                 </div>
@@ -166,14 +224,36 @@ export default function AdminPlansPage() {
                 {/* Pricing */}
                 <div>
                   <h4 className="text-sm font-medium text-text-secondary mb-2">Pricing:</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {plan.pricings?.map(p => (
-                      <div key={p.id} className="bg-gray-50 rounded-lg p-3 text-center">
-                        <p className="text-xs text-text-secondary">{p.billingCycle.replace('_', ' ')}</p>
-                        <p className="text-lg font-bold text-text-primary">{p.price} {p.currency}</p>
+                      <div key={p.id} className="bg-gray-50 rounded-lg p-3 border hover:shadow-sm transition-shadow">
+                        <div className="text-center mb-2">
+                          <p className="text-xs text-text-secondary">{p.billingCycle.replace('_', ' ')}</p>
+                          <p className="text-lg font-bold text-text-primary">{p.price} {p.currency}</p>
+                        </div>
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditPricing(plan, p)}
+                            className="flex-1 text-xs"
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openDeletePricing(p)}
+                            className="flex-1 text-xs text-red-600 hover:text-red-700 hover:border-red-300"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     ))}
-                    {(!plan.pricings || plan.pricings.length === 0) && <span className="text-xs text-gray-400">No pricing set</span>}
+                    {(!plan.pricings || plan.pricings.length === 0) && (
+                      <span className="text-xs text-gray-400 col-span-full">No pricing set</span>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -222,7 +302,7 @@ export default function AdminPlansPage() {
         </Modal>
 
         {/* Pricing Modal */}
-        <Modal isOpen={showPricingModal} onClose={() => setShowPricingModal(false)} title={`Set Pricing: ${selectedPlanForPricing?.name}`}>
+        <Modal isOpen={showPricingModal} onClose={() => setShowPricingModal(false)} title={`${editingPricing ? 'Edit' : 'Add'} Pricing: ${selectedPlanForPricing?.name}`}>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-text-primary mb-1">Billing Cycle</label>
@@ -238,7 +318,24 @@ export default function AdminPlansPage() {
             <Input label="Currency" value={pricingForm.currency} onChange={(e) => setPricingForm(prev => ({ ...prev, currency: e.target.value }))} />
             <div className="flex space-x-3 pt-4">
               <Button variant="ghost" onClick={() => setShowPricingModal(false)} className="flex-1">Cancel</Button>
-              <Button variant="primary" onClick={handleSavePricing} className="flex-1">Save Pricing</Button>
+              <Button variant="primary" onClick={handleSavePricing} className="flex-1">{editingPricing ? 'Update' : 'Save'} Pricing</Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete Pricing Confirmation Modal */}
+        <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Pricing">
+          <div className="space-y-4">
+            <p className="text-text-secondary">
+              Are you sure you want to delete the {deletingPricing?.billingCycle.replace('_', ' ').toLowerCase()} pricing 
+              of {deletingPricing?.price} {deletingPricing?.currency}?
+            </p>
+            <p className="text-sm text-red-600">
+              This action cannot be undone. If there are active subscriptions using this pricing, the deletion will be prevented.
+            </p>
+            <div className="flex space-x-3 pt-4">
+              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)} className="flex-1">Cancel</Button>
+              <Button variant="danger" onClick={handleDeletePricing} className="flex-1">Delete</Button>
             </div>
           </div>
         </Modal>

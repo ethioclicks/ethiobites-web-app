@@ -109,6 +109,20 @@ export async function setPlanPricing(planId: number, pricing: Omit<PlanPricing, 
   return response.data;
 }
 
+export async function getPlanPricingById(pricingId: number): Promise<PlanPricing> {
+  const response = await apiClient.get<PlanPricing>(`/admin/subscription/pricing/${pricingId}`);
+  return response.data;
+}
+
+export async function updatePlanPricing(pricingId: number, pricing: Partial<PlanPricing>): Promise<PlanPricing> {
+  const response = await apiClient.put<PlanPricing>(`/admin/subscription/pricing/${pricingId}`, pricing);
+  return response.data;
+}
+
+export async function deletePlanPricing(pricingId: number): Promise<void> {
+  await apiClient.delete(`/admin/subscription/pricing/${pricingId}`);
+}
+
 // ===== ADMIN: PAYMENTS =====
 
 export async function getAllPayments(page = 0, size = 20): Promise<PageResponse<PaymentRequest>> {
