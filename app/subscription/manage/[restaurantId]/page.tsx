@@ -12,6 +12,7 @@ import Loading from '@/components/ui/Loading';
 import { 
   getActivePlans, 
   getMySubscription, 
+  getMySubscriptionHistory,
   subscribe, 
   Plan, 
   Subscription 
@@ -30,6 +31,7 @@ export default function ManageSubscriptionPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
+  const [subscriptionHistory, setSubscriptionHistory] = useState<Subscription[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [selectedCycle, setSelectedCycle] = useState('MONTHLY');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -61,14 +63,16 @@ export default function ManageSubscriptionPage() {
       setIsLoading(true);
       setError('');
       
-      const [plansData, subData, restaurantData] = await Promise.all([
+      const [plansData, subData, historyData, restaurantData] = await Promise.all([
         getActivePlans(),
         getMySubscription(),
+        getMySubscriptionHistory(),
         getRestaurantByPublicId(restaurantId)
       ]);
       
       setPlans(plansData);
       setCurrentSubscription(subData);
+      setSubscriptionHistory(historyData);
       setRestaurant(restaurantData);
     } catch (err: any) {
       console.error('Error loading data:', err);
@@ -150,6 +154,23 @@ export default function ManageSubscriptionPage() {
   const getPrice = (plan: Plan, cycle: string) => {
     const pricing = plan.pricings?.find(p => p.billingCycle === cycle);
     return pricing ? `${pricing.price} ${pricing.currency}` : 'Contact us for pricing';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-green-100 text-green-700 border-green-200';
+      case 'PENDING':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'EXPIRED':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'CANCELLED':
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'REJECTED':
+        return 'bg-red-100 text-red-700 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
   };
 
   if (status === 'loading' || isLoading) {
@@ -259,15 +280,19 @@ export default function ManageSubscriptionPage() {
             </div>
           )}
 
-          {/* Current Subscription */}
-          {currentSubscription && (
-            <Card className="p-6 mb-8 border-green-200 bg-green-50">
+          {/* Current Subscription - Only show if active */}
+          {currentSubscription && currentSubscription.status === 'ACTIVE' && (
+            <Card className="p-6 mb-8 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-green-700">Current Active Plan</h3>
-                  <p className="text-green-600 font-medium">{currentSubscription.plan?.name}</p>
+                  <h3 className="text-lg font-semibold text-green-700 flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    Current Active Plan
+                  </h3>
+                  <p className="text-green-700 font-bold text-xl">{currentSubscription.plan?.name}</p>
                   <p className="text-green-600 text-sm">
-                    Status: {currentSubscription.status} | 
                     Billing: {currentSubscription.billingCycle.replace('_', ' ').toLowerCase()}
                   </p>
                   {currentSubscription.endDate && (
@@ -276,12 +301,109 @@ export default function ManageSubscriptionPage() {
                     </p>
                   )}
                 </div>
-                <div className="bg-green-200 text-green-800 px-4 py-2 rounded-full text-sm font-bold">
-                  ACTIVE
+                <div className="text-center">
+                  <div className="bg-green-200 text-green-800 px-4 py-2 rounded-full text-sm font-bold mb-2">
+                    ACTIVE
+                  </div>
+                  <div className="text-green-600 text-xs">
+                    {currentSubscription.endDate && (
+                      <>
+                        {Math.ceil((new Date(currentSubscription.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
           )}
+
+          {/* Subscription History */}
+          <Card className="p-6 mb-8">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">My Subscriptions</h3>
+            {subscriptionHistory.length > 0 ? (
+              <div className="space-y-4">
+                {subscriptionHistory.map((subscription) => (
+                  <div
+                    key={subscription.id}
+                    className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-1">
+                        <h4 className="font-semibold text-gray-900">
+                          {subscription.plan?.name || 'Unknown Plan'}
+                        </h4>
+                        <span className={`text-xs px-2 py-1 rounded-full border ${getStatusColor(subscription.status)}`}>
+                          {subscription.status}
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <p>
+                          <span className="font-medium">Billing:</span> {subscription.billingCycle.replace('_', ' ')}
+                        </p>
+                        
+                        <div className="flex space-x-6">
+                          {subscription.startDate && (
+                            <p>
+                              <span className="font-medium">Started:</span> {new Date(subscription.startDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          
+                          {subscription.endDate && (
+                            <p>
+                              <span className="font-medium">
+                                {subscription.status === 'ACTIVE' ? 'Expires:' : 'Ended:'}
+                              </span> {new Date(subscription.endDate).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <p className="text-xs text-gray-500">
+                          Created: {new Date(subscription.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      {subscription.status === 'ACTIVE' && (
+                        <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                          Current Plan
+                        </div>
+                      )}
+                      {subscription.status === 'EXPIRED' && (
+                        <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                          Expired
+                        </div>
+                      )}
+                      {subscription.status === 'PENDING' && (
+                        <div className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
+                          Under Review
+                        </div>
+                      )}
+                      {subscription.status === 'CANCELLED' && (
+                        <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
+                          Cancelled
+                        </div>
+                      )}
+                      {subscription.status === 'REJECTED' && (
+                        <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
+                          Rejected
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m6 0h6m6 0h6M9 16h6m6 0h6m6 0h6M9 20h6m6 0h6m6 0h6" />
+                </svg>
+                <p className="text-sm">No subscription history found.</p>
+                <p className="text-xs text-gray-400 mt-1">Choose a plan below to get started!</p>
+              </div>
+            )}
+          </Card>
 
           {/* Available Plans */}
           <div className="mb-8">
