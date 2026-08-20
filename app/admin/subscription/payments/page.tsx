@@ -9,7 +9,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Loading from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
-import { getAllPayments, approvePayment, rejectPayment, PaymentRequest, PageResponse } from '@/lib/api/subscription';
+import { getAllPayments, approvePayment, rejectPayment, deletePayment, PaymentRequest, PageResponse } from '@/lib/api/subscription';
 
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
@@ -17,8 +17,11 @@ export default function AdminPaymentsPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRequest | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<PaymentRequest | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending'>('pending');
   const { data: session, status } = useSession();
@@ -70,6 +73,31 @@ export default function AdminPaymentsPage() {
     } catch (err: any) {
       setError(err.message || 'Failed to reject payment');
     }
+  };
+
+  const handleDelete = async () => {
+    if (!paymentToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deletePayment(paymentToDelete.id);
+      setShowDeleteModal(false);
+      setPaymentToDelete(null);
+      loadPayments();
+    } catch (err: any) {
+      // Handle 404 specifically for missing endpoint
+      if (err.response?.status === 404) {
+        setError('Delete functionality not available - backend endpoint missing');
+      } else {
+        setError(err.message || 'Failed to delete payment');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const openDeleteConfirm = (payment: PaymentRequest) => {
+    setPaymentToDelete(payment);
+    setShowDeleteModal(true);
   };
 
   const openReview = (payment: PaymentRequest) => {
@@ -132,6 +160,14 @@ export default function AdminPaymentsPage() {
                     {payment.status === 'PENDING' && (
                       <Button variant="primary" size="sm" onClick={() => openReview(payment)}>Review</Button>
                     )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => openDeleteConfirm(payment)}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                    >
+                      Delete
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -172,6 +208,54 @@ export default function AdminPaymentsPage() {
               <div className="flex space-x-3 pt-4">
                 <Button variant="ghost" onClick={handleReject} className="flex-1 text-red-600 border-red-200 hover:bg-red-50">Reject</Button>
                 <Button variant="primary" onClick={handleApprove} className="flex-1">Approve</Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Payment">
+          {paymentToDelete && (
+            <div className="space-y-4">
+              <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800">Delete Payment Record</h3>
+                    <p className="text-sm text-red-700 mt-1">This action cannot be undone. The payment record will be permanently deleted.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <p><strong>User:</strong> {paymentToDelete.user?.firstName} {paymentToDelete.user?.lastName}</p>
+                <p><strong>Plan:</strong> {paymentToDelete.subscription?.plan?.name}</p>
+                <p><strong>Amount:</strong> {paymentToDelete.amount} {paymentToDelete.currency}</p>
+                <p><strong>Status:</strong> {paymentToDelete.status}</p>
+                <p><strong>Submitted:</strong> {new Date(paymentToDelete.createdAt).toLocaleDateString()}</p>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleDelete}
+                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                  loading={isDeleting}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Payment'}
+                </Button>
               </div>
             </div>
           )}

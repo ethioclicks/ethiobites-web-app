@@ -213,7 +213,7 @@ export default function RestaurantCard({
             )} */}
             
             <a
-              href={`/subscription?restaurant=${restaurant.restaurantPublicId || restaurant.id}`}
+              href={`/subscription/manage/${restaurant.restaurantPublicId || restaurant.id}`}
               className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors text-center block"
             >
               {(restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > new Date()) || restaurant.isActive ? 'Manage Subscription' : 'Subscribe Now'}

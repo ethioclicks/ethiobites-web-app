@@ -145,6 +145,10 @@ export async function rejectPayment(id: number, notes?: string): Promise<Payment
   return response.data;
 }
 
+export async function deletePayment(id: number): Promise<void> {
+  await apiClient.delete(`/admin/subscription/payments/${id}`);
+}
+
 // ===== USER: PLANS =====
 
 export async function getActivePlans(): Promise<Plan[]> {

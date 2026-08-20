@@ -23,10 +23,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
-      },
-      {
-        protocol: 'https',
         hostname: 'lh3.googleusercontent.com', // Google profile images
       },
       {
@@ -35,7 +31,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'wvveitdbktlvigdsxscd.supabase.co', // Supabase storage for restaurant images
+        hostname: 'wvveitdbktlvigdsxscd.supabase.co', // Supabase storage for all images
       },
       {
         protocol: 'https',

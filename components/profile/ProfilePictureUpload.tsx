@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import Button from '@/components/ui/Button';
 
 interface ProfilePictureUploadProps {
@@ -45,22 +44,30 @@ export default function ProfilePictureUpload({
     };
     reader.readAsDataURL(file);
 
-    // Upload to Firebase Storage
+    // Upload to Supabase Storage
     setIsUploading(true);
     try {
       // Create unique filename
       const timestamp = Date.now();
       const filename = `profile-pictures/${timestamp}-${file.name}`;
-      const storageRef = ref(storage, filename);
 
-      // Upload file
-      const snapshot = await uploadBytes(storageRef, file);
-      
-      // Get download URL
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      // Upload file to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(filename, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filename);
       
       // Call callback with new image URL
-      onImageUploaded(downloadURL);
+      onImageUploaded(publicUrl);
       
     } catch (error) {
       console.error('Upload error:', error);
