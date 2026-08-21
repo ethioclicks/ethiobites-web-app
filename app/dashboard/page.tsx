@@ -163,7 +163,7 @@ export default function Dashboard() {
               {greeting}{profile?.firstName ? `, ${profile.firstName}` : ''}!
             </h1>
             <p className="text-text-secondary">
-              Manage your restaurants and subscriptions from your dashboard.
+              Manage your restaurants from your dashboard.
             </p>
           </div>
 
@@ -177,8 +177,7 @@ export default function Dashboard() {
                       Register Your Restaurant
                     </h3>
                     <p className="text-text-secondary mb-4">
-                      Use our mobile app to easily register your restaurant, upload menus, and manage your business on the go. 
-                      Once registered, you can manage subscriptions here on the web dashboard.
+                      Use our mobile app to easily register your restaurant, upload menus, and manage your business on the go.
                     </p>
                     <div className="flex flex-wrap gap-4">
                       <a 
@@ -234,7 +233,6 @@ export default function Dashboard() {
                   <RestaurantCard
                     key={restaurant.id}
                     restaurant={restaurant}
-                    onManageSubscription={() => {}} // No longer needed since we use navigation
                   />
                 ))}
               </div>

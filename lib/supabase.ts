@@ -67,18 +67,4 @@ export const uploadFileToSupabase = async (
   }
 };
 
-/**
- * Upload receipt image specifically for subscription payments
- * @param file - Receipt image file
- * @param restaurantId - Restaurant public ID
- * @returns Promise<string> - Public URL of uploaded receipt
- */
-export const uploadReceiptImage = async (
-  file: File,
-  restaurantId: string
-): Promise<string> => {
-  const path = `subscription-receipts/${restaurantId}`;
-  return uploadFileToSupabase(file, 'ethio-bites', path);
-};
-
 export default supabase;

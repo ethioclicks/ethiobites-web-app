@@ -70,7 +70,6 @@ export interface Restaurant {
     tag: string;
     description: string;
     registerDate: string;
-    subscriptionEndDate?: string;
     menus: Menu[];
     drinks: Drink[];
     street: string;

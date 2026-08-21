@@ -6,339 +6,318 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Container from '@/components/layout/Container';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import Loading from '@/components/ui/Loading';
-import Modal from '@/components/ui/Modal';
 import {
-  getAdminPlans, createPlan, updatePlan, getFeatures, setPlanPricing,
-  updatePlanPricing, deletePlanPricing,
+  getAdminPlans, createPlan, updatePlan, getFeatures,
+  getPlanPricings, setPlanPricing, deletePlanPricing,
   Plan, Feature, PlanPricing
 } from '@/lib/api/subscription';
 
-const BILLING_CYCLES = [
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly' },
-  { value: 'SEMI_YEARLY', label: 'Semi-Yearly' },
-  { value: 'YEARLY', label: 'Yearly' },
-];
-
 export default function AdminPlansPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  const [showPricingModal, setShowPricingModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [selectedPlanForPricing, setSelectedPlanForPricing] = useState<Plan | null>(null);
-  const [editingPricing, setEditingPricing] = useState<PlanPricing | null>(null);
-  const [deletingPricing, setDeletingPricing] = useState<PlanPricing | null>(null);
-  const [planForm, setPlanForm] = useState({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] as number[] });
-  const [pricingForm, setPricingForm] = useState({ billingCycle: 'MONTHLY', price: '', currency: 'ETB' });
-  const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [features, setFeatures] = useState<Feature[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Plan form
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Plan | null>(null);
+  const [form, setForm] = useState({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] as number[] });
+
+  // Pricing management
+  const [pricingPlanId, setPricingPlanId] = useState<number | null>(null);
+  const [pricings, setPricings] = useState<PlanPricing[]>([]);
+  const [pricingForm, setPricingForm] = useState({ billingCycle: 'MONTHLY' as string, price: '', currency: 'ETB' });
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/auth/login');
     if (status === 'authenticated' && session) {
       if (session.accessToken) localStorage.setItem('token', session.accessToken);
       if (session.user?.pid) localStorage.setItem('pid', session.user.pid);
       loadData();
     }
+    if (status === 'unauthenticated') router.push('/auth/login');
   }, [status, session]);
 
   const loadData = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const [plansData, featuresData] = await Promise.all([getAdminPlans(), getFeatures()]);
       setPlans(plansData);
       setFeatures(featuresData);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load data');
+    } catch (err) {
+      console.error('Failed to load data:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleSavePlan = async () => {
+  const handleSubmit = async () => {
+    if (!form.name) return;
     try {
-      const payload = {
-        name: planForm.name,
-        description: planForm.description,
-        isActive: planForm.isActive,
-        sortOrder: planForm.sortOrder,
-        features: features.filter(f => planForm.featureIds.includes(f.id!)),
+      setSaving(true);
+      const planData = {
+        name: form.name,
+        description: form.description,
+        isActive: form.isActive,
+        sortOrder: form.sortOrder,
+        features: form.featureIds.map(id => ({ id } as Feature)),
       };
-      if (editingPlan?.id) {
-        await updatePlan(editingPlan.id, payload);
+      if (editing) {
+        await updatePlan(editing.id!, planData);
       } else {
-        await createPlan(payload);
+        await createPlan(planData);
       }
-      setShowPlanModal(false);
-      loadData();
+      setShowForm(false);
+      setEditing(null);
+      setForm({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] });
+      await loadData();
     } catch (err: any) {
-      setError(err.message || 'Failed to save plan');
+      alert(err.message || 'Operation failed');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSavePricing = async () => {
-    if (!selectedPlanForPricing?.id) return;
-    try {
-      setError('');
-      const pricingData = {
-        billingCycle: pricingForm.billingCycle as any,
-        price: parseFloat(pricingForm.price),
-        currency: pricingForm.currency,
-      };
-      
-      if (editingPricing?.id) {
-        // Update existing pricing
-        await updatePlanPricing(editingPricing.id, pricingData);
-        setSuccessMessage('Pricing updated successfully!');
-      } else {
-        // Create new pricing
-        await setPlanPricing(selectedPlanForPricing.id, pricingData);
-        setSuccessMessage('Pricing added successfully!');
-      }
-      
-      setShowPricingModal(false);
-      setEditingPricing(null);
-      loadData();
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save pricing');
-    }
-  };
-
-  const handleDeletePricing = async () => {
-    if (!deletingPricing?.id) return;
-    try {
-      setError('');
-      await deletePlanPricing(deletingPricing.id);
-      setShowDeleteConfirm(false);
-      setDeletingPricing(null);
-      setSuccessMessage('Pricing deleted successfully!');
-      loadData();
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete pricing');
-      setShowDeleteConfirm(false);
-      setDeletingPricing(null);
-    }
-  };
-
-  const openEditPlan = (plan: Plan) => {
-    setEditingPlan(plan);
-    setPlanForm({
+  const handleEditPlan = (plan: Plan) => {
+    setEditing(plan);
+    setForm({
       name: plan.name,
-      description: plan.description,
+      description: plan.description || '',
       isActive: plan.isActive,
-      sortOrder: plan.sortOrder,
+      sortOrder: plan.sortOrder || 0,
       featureIds: plan.features?.map(f => f.id!) || [],
     });
-    setShowPlanModal(true);
+    setShowForm(true);
   };
 
-  const openPricing = (plan: Plan) => {
-    setSelectedPlanForPricing(plan);
-    setEditingPricing(null);
-    setPricingForm({ billingCycle: 'MONTHLY', price: '', currency: 'ETB' });
-    setShowPricingModal(true);
+  const handleManagePricing = async (planId: number) => {
+    setPricingPlanId(planId);
+    try {
+      const data = await getPlanPricings(planId);
+      setPricings(data);
+    } catch (err) {
+      console.error('Failed to load pricings:', err);
+    }
   };
 
-  const openEditPricing = (plan: Plan, pricing: PlanPricing) => {
-    setSelectedPlanForPricing(plan);
-    setEditingPricing(pricing);
-    setPricingForm({
-      billingCycle: pricing.billingCycle,
-      price: pricing.price.toString(),
-      currency: pricing.currency,
-    });
-    setShowPricingModal(true);
+  const handleAddPricing = async () => {
+    if (!pricingPlanId || !pricingForm.price) return;
+    try {
+      await setPlanPricing(pricingPlanId, {
+        billingCycle: pricingForm.billingCycle as PlanPricing['billingCycle'],
+        price: parseFloat(pricingForm.price),
+        currency: pricingForm.currency,
+      });
+      const data = await getPlanPricings(pricingPlanId);
+      setPricings(data);
+      setPricingForm({ billingCycle: 'MONTHLY', price: '', currency: 'ETB' });
+    } catch (err: any) {
+      alert(err.message || 'Failed to set pricing');
+    }
   };
 
-  const openDeletePricing = (pricing: PlanPricing) => {
-    setDeletingPricing(pricing);
-    setShowDeleteConfirm(true);
+  const handleDeletePricing = async (pricingId: number) => {
+    if (!pricingPlanId || !confirm('Delete this pricing?')) return;
+    try {
+      await deletePlanPricing(pricingId);
+      const data = await getPlanPricings(pricingPlanId);
+      setPricings(data);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete pricing');
+    }
   };
 
-  if (status === 'loading' || isLoading) {
-    return (<><Header /><Container><div className="flex justify-center items-center min-h-[400px]"><Loading size="lg" /></div></Container></>);
+  const formatBillingCycle = (cycle: string) => {
+    return cycle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  if (status === 'loading' || loading) {
+    return (
+      <>
+        <Header />
+        <Container>
+          <div className="flex justify-center items-center min-h-[400px]">
+            <Loading size="lg" />
+          </div>
+        </Container>
+      </>
+    );
   }
 
   return (
     <>
       <Header />
       <Container>
-        <div className="max-w-5xl mx-auto py-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="py-8 max-w-5xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-text-primary">Manage Plans</h1>
-              <p className="text-text-secondary">Create plans, assign features, and set pricing</p>
+              <button onClick={() => router.push('/admin-dashboard')} className="text-sm text-primary-600 hover:text-primary-700 mb-2 inline-flex items-center">
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Admin
+              </button>
+              <h1 className="text-2xl font-bold text-text-primary">Manage Plans</h1>
             </div>
-            <Button variant="primary" onClick={() => { setEditingPlan(null); setPlanForm({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] }); setShowPlanModal(true); }}>
+            <button
+              onClick={() => { setShowForm(true); setEditing(null); setForm({ name: '', description: '', isActive: true, sortOrder: 0, featureIds: [] }); }}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+            >
               Add Plan
-            </Button>
+            </button>
           </div>
 
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-6">{error}</div>}
-          {successMessage && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 text-sm mb-6">{successMessage}</div>}
-
-          <div className="space-y-6">
-            {plans.map((plan) => (
-              <Card key={plan.id} className="p-6">
-                <div className="flex items-start justify-between mb-4">
+          {/* Plan Form */}
+          {showForm && (
+            <Card className="p-6 mb-6">
+              <h2 className="text-lg font-semibold mb-4">{editing ? 'Edit' : 'New'} Plan</h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <div className="flex items-center space-x-3">
-                      <h3 className="text-xl font-semibold text-text-primary">{plan.name}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${plan.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {plan.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-text-secondary mt-1">{plan.description}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Plan Name</label>
+                    <input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Basic, Standard, Premium" className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
                   </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => openPricing(plan)}>Add Pricing</Button>
-                    <Button variant="outline" size="sm" onClick={() => openEditPlan(plan)}>Edit</Button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+                    <input type="number" value={form.sortOrder} onChange={e => setForm({...form, sortOrder: parseInt(e.target.value) || 0})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
                   </div>
                 </div>
-
-                {/* Features */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Features:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {plan.features?.map(f => (
-                      <span key={f.id} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">{f.name}</span>
-                    ))}
-                    {(!plan.features || plan.features.length === 0) && <span className="text-xs text-gray-400">No features assigned</span>}
-                  </div>
-                </div>
-
-                {/* Pricing */}
                 <div>
-                  <h4 className="text-sm font-medium text-text-secondary mb-2">Pricing:</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {plan.pricings?.map(p => (
-                      <div key={p.id} className="bg-gray-50 rounded-lg p-3 border hover:shadow-sm transition-shadow">
-                        <div className="text-center mb-2">
-                          <p className="text-xs text-text-secondary">{p.billingCycle.replace('_', ' ')}</p>
-                          <p className="text-lg font-bold text-text-primary">{p.price} {p.currency}</p>
-                        </div>
-                        <div className="flex space-x-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditPricing(plan, p)}
-                            className="flex-1 text-xs"
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openDeletePricing(p)}
-                            className="flex-1 text-xs text-red-600 hover:text-red-700 hover:border-red-300"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    {(!plan.pricings || plan.pricings.length === 0) && (
-                      <span className="text-xs text-gray-400 col-span-full">No pricing set</span>
-                    )}
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Plan description" className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" rows={2} />
                 </div>
-              </Card>
-            ))}
-            {plans.length === 0 && <div className="text-center py-12 text-text-secondary">No plans yet.</div>}
-          </div>
-        </div>
-
-        {/* Plan Modal */}
-        <Modal isOpen={showPlanModal} onClose={() => setShowPlanModal(false)} title={editingPlan ? 'Edit Plan' : 'Add Plan'}>
-          <div className="space-y-4">
-            <Input label="Plan Name" value={planForm.name} onChange={(e) => setPlanForm(prev => ({ ...prev, name: e.target.value }))} required />
-            <Input label="Description" value={planForm.description} onChange={(e) => setPlanForm(prev => ({ ...prev, description: e.target.value }))} />
-            <Input label="Sort Order" type="number" value={String(planForm.sortOrder)} onChange={(e) => setPlanForm(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))} />
-            <label className="flex items-center space-x-2">
-              <input type="checkbox" checked={planForm.isActive} onChange={(e) => setPlanForm(prev => ({ ...prev, isActive: e.target.checked }))} className="rounded" />
-              <span className="text-sm">Active</span>
-            </label>
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">Features</label>
-              <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3">
-                {features.filter(f => f.isActive).map(f => (
-                  <label key={f.id} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={planForm.featureIds.includes(f.id!)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setPlanForm(prev => ({ ...prev, featureIds: [...prev.featureIds, f.id!] }));
-                        } else {
-                          setPlanForm(prev => ({ ...prev, featureIds: prev.featureIds.filter(id => id !== f.id) }));
-                        }
-                      }}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{f.name}</span>
-                  </label>
-                ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
+                  {features.length === 0 ? (
+                    <p className="text-sm text-gray-500">No features available. Create features first.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {features.filter(f => f.isActive).map(f => (
+                        <label key={f.id} className="flex items-center gap-2 text-sm p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={form.featureIds.includes(f.id!)}
+                            onChange={e => {
+                              if (e.target.checked) setForm({...form, featureIds: [...form.featureIds, f.id!]});
+                              else setForm({...form, featureIds: form.featureIds.filter(id => id !== f.id!)});
+                            }}
+                            className="rounded"
+                          />
+                          {f.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.isActive} onChange={e => setForm({...form, isActive: e.target.checked})} className="rounded" />
+                  Active (visible to users)
+                </label>
               </div>
-            </div>
-            <div className="flex space-x-3 pt-4">
-              <Button variant="ghost" onClick={() => setShowPlanModal(false)} className="flex-1">Cancel</Button>
-              <Button variant="primary" onClick={handleSavePlan} className="flex-1">{editingPlan ? 'Update' : 'Create'}</Button>
-            </div>
-          </div>
-        </Modal>
+              <div className="flex gap-3 mt-4">
+                <button onClick={handleSubmit} disabled={saving} className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:bg-gray-400 transition-colors">
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button onClick={() => { setShowForm(false); setEditing(null); }} className="border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </Card>
+          )}
 
-        {/* Pricing Modal */}
-        <Modal isOpen={showPricingModal} onClose={() => setShowPricingModal(false)} title={`${editingPricing ? 'Edit' : 'Add'} Pricing: ${selectedPlanForPricing?.name}`}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1">Billing Cycle</label>
-              <select
-                value={pricingForm.billingCycle}
-                onChange={(e) => setPricingForm(prev => ({ ...prev, billingCycle: e.target.value }))}
-                className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-              >
-                {BILLING_CYCLES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <Input label="Price" type="number" value={pricingForm.price} onChange={(e) => setPricingForm(prev => ({ ...prev, price: e.target.value }))} placeholder="0.00" required />
-            <Input label="Currency" value={pricingForm.currency} onChange={(e) => setPricingForm(prev => ({ ...prev, currency: e.target.value }))} />
-            <div className="flex space-x-3 pt-4">
-              <Button variant="ghost" onClick={() => setShowPricingModal(false)} className="flex-1">Cancel</Button>
-              <Button variant="primary" onClick={handleSavePricing} className="flex-1">{editingPricing ? 'Update' : 'Save'} Pricing</Button>
-            </div>
-          </div>
-        </Modal>
+          {/* Pricing Management */}
+          {pricingPlanId && (
+            <Card className="p-6 mb-6 border-blue-200 bg-blue-50">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold text-blue-900">Pricing — {plans.find(p => p.id === pricingPlanId)?.name}</h2>
+                <button onClick={() => setPricingPlanId(null)} className="text-gray-500 hover:text-gray-700 text-xl leading-none">&times;</button>
+              </div>
 
-        {/* Delete Pricing Confirmation Modal */}
-        <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Pricing">
-          <div className="space-y-4">
-            <p className="text-text-secondary">
-              Are you sure you want to delete the {deletingPricing?.billingCycle.replace('_', ' ').toLowerCase()} pricing 
-              of {deletingPricing?.price} {deletingPricing?.currency}?
-            </p>
-            <p className="text-sm text-red-600">
-              This action cannot be undone. If there are active subscriptions using this pricing, the deletion will be prevented.
-            </p>
-            <div className="flex space-x-3 pt-4">
-              <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)} className="flex-1">Cancel</Button>
-              <Button variant="danger" onClick={handleDeletePricing} className="flex-1">Delete</Button>
+              {/* Add pricing form */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                <select
+                  value={pricingForm.billingCycle}
+                  onChange={e => setPricingForm({...pricingForm, billingCycle: e.target.value})}
+                  className="border border-gray-300 rounded-lg p-2 text-sm"
+                >
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="QUARTERLY">Quarterly</option>
+                  <option value="SEMI_YEARLY">Semi-Yearly</option>
+                  <option value="YEARLY">Yearly</option>
+                </select>
+                <input
+                  type="number"
+                  value={pricingForm.price}
+                  onChange={e => setPricingForm({...pricingForm, price: e.target.value})}
+                  placeholder="Price (ETB)"
+                  className="border border-gray-300 rounded-lg p-2 w-32 text-sm"
+                />
+                <button onClick={handleAddPricing} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm transition-colors">
+                  Add Pricing
+                </button>
+              </div>
+
+              {/* Existing pricings */}
+              {pricings.length === 0 ? (
+                <p className="text-sm text-gray-500">No pricing set yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {pricings.map(p => (
+                    <div key={p.id} className="flex justify-between items-center bg-white p-3 rounded-lg border">
+                      <span className="text-sm font-medium">{formatBillingCycle(p.billingCycle)} — <span className="text-primary-600">{p.price} {p.currency}</span></span>
+                      <button onClick={() => handleDeletePricing(p.id!)} className="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Plans List */}
+          {plans.length === 0 ? (
+            <Card className="p-8 text-center text-gray-500">
+              No plans yet. Click &quot;Add Plan&quot; to create one.
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {plans.map(plan => (
+                <Card key={plan.id} className="p-5">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-lg">{plan.name}</h3>
+                        <span className={`px-2 py-0.5 rounded text-xs ${plan.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {plan.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 mb-3">{plan.description}</p>
+                      {plan.features && plan.features.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {plan.features.map(f => (
+                            <span key={f.id} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{f.name}</span>
+                          ))}
+                        </div>
+                      )}
+                      {plan.pricings && plan.pricings.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {plan.pricings.map(p => (
+                            <span key={p.id} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                              {formatBillingCycle(p.billingCycle)}: {p.price} {p.currency}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-3 ml-4">
+                      <button onClick={() => handleManagePricing(plan.id!)} className="text-purple-600 hover:text-purple-800 text-sm font-medium">Pricing</button>
+                      <button onClick={() => handleEditPlan(plan)} className="text-blue-600 hover:text-blue-800 text-sm font-medium">Edit</button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
-          </div>
-        </Modal>
+          )}
+        </div>
       </Container>
     </>
   );

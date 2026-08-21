@@ -4,14 +4,12 @@ import Card from '@/components/ui/Card';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
-  onManageSubscription: (restaurant: Restaurant) => void;
   onDelete?: (restaurantId: number) => void;
   showActions?: boolean;
 }
 
 export default function RestaurantCard({ 
   restaurant, 
-  onManageSubscription, 
   onDelete,
   showActions = true 
 }: RestaurantCardProps) {
@@ -55,25 +53,21 @@ export default function RestaurantCard({
     return restaurant.phone || restaurant.phoneNumber || null;
   };
 
-  // Get subscription status based on new API format
-  const getSubscriptionStatus = () => {
-    const isActive = restaurant.subscriptionEndDate ? 
-      new Date(restaurant.subscriptionEndDate) > new Date() : 
-      restaurant.isActive;
-    
+  // Get restaurant status
+  const getRestaurantStatus = () => {
     const isApproved = restaurant.restaurantStatus === 'APPROVED' || restaurant.isApproved;
     
-    if (isActive && isApproved) {
-      return { text: 'Active Subscription', color: 'bg-green-100 text-green-700' };
-    } else if (isApproved && !isActive) {
-      return { text: 'Subscription Expired', color: 'bg-yellow-100 text-yellow-700' };
+    if (isApproved && restaurant.isActive) {
+      return { text: 'Active', color: 'bg-green-100 text-green-700' };
+    } else if (isApproved && !restaurant.isActive) {
+      return { text: 'Inactive', color: 'bg-yellow-100 text-yellow-700' };
     } else if (!isApproved) {
       return { text: 'Pending Approval', color: 'bg-gray-100 text-gray-700' };
     }
     return { text: 'Inactive', color: 'bg-red-100 text-red-700' };
   };
 
-  const subscriptionStatus = getSubscriptionStatus();
+  const restaurantStatus = getRestaurantStatus();
   const restaurantImage = getRestaurantImage();
   const restaurantAddress = getRestaurantAddress();
   const restaurantPhone = getRestaurantPhone();
@@ -106,8 +100,8 @@ export default function RestaurantCard({
         
         {/* Status Badges */}
         <div className="absolute top-3 right-3 flex flex-col gap-1">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${subscriptionStatus.color}`}>
-            {subscriptionStatus.text}
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${restaurantStatus.color}`}>
+            {restaurantStatus.text}
           </span>
           {(restaurant.isFeature || restaurant.tag === 'Featured') && (
             <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
@@ -198,25 +192,11 @@ export default function RestaurantCard({
         {/* Actions */}
         {showActions && (
           <div className="space-y-2">
-            {/* Manage Restaurant Button - Hidden for now */}
-            {/* {restaurant.id ? (
-              <a
-                href={`/restaurant/${restaurant.id}`}
-                className="w-full bg-gray-900 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-gray-800 transition-colors text-center block"
-              >
-                Manage Restaurant
-              </a>
-            ) : (
-              <span className="w-full bg-gray-400 text-white py-2.5 px-4 rounded-lg font-medium text-center block cursor-not-allowed">
-                Manage Restaurant
-              </span>
-            )} */}
-            
             <a
               href={`/subscription/manage/${restaurant.restaurantPublicId || restaurant.id}`}
               className="w-full bg-primary-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors text-center block"
             >
-              {(restaurant.subscriptionEndDate && new Date(restaurant.subscriptionEndDate) > new Date()) || restaurant.isActive ? 'Manage Subscription' : 'Subscribe Now'}
+              Manage Subscription
             </a>
 
             {/* Quick stats for owners */}

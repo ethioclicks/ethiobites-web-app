@@ -29,6 +29,7 @@ export interface Plan {
 
 export interface Subscription {
   id: number;
+  restaurant: { id: number; name: string; restaurantPublicId: string };
   plan: Plan;
   billingCycle: string;
   status: 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'REJECTED';
@@ -109,11 +110,6 @@ export async function setPlanPricing(planId: number, pricing: Omit<PlanPricing, 
   return response.data;
 }
 
-export async function getPlanPricingById(pricingId: number): Promise<PlanPricing> {
-  const response = await apiClient.get<PlanPricing>(`/admin/subscription/pricing/${pricingId}`);
-  return response.data;
-}
-
 export async function updatePlanPricing(pricingId: number, pricing: Partial<PlanPricing>): Promise<PlanPricing> {
   const response = await apiClient.put<PlanPricing>(`/admin/subscription/pricing/${pricingId}`, pricing);
   return response.data;
@@ -161,11 +157,11 @@ export async function getPlanDetails(id: number): Promise<Plan> {
   return response.data;
 }
 
-// ===== USER: SUBSCRIPTION =====
+// ===== USER: RESTAURANT SUBSCRIPTION =====
 
-export async function getMySubscription(): Promise<Subscription | null> {
+export async function getRestaurantSubscription(restaurantId: number): Promise<Subscription | null> {
   try {
-    const response = await apiClient.get<Subscription>('/subscription/my');
+    const response = await apiClient.get<Subscription>(`/subscription/restaurant/${restaurantId}`);
     return response.data;
   } catch (error: any) {
     if (error.response?.status === 204) return null;
@@ -173,13 +169,19 @@ export async function getMySubscription(): Promise<Subscription | null> {
   }
 }
 
-export async function getMySubscriptionHistory(): Promise<Subscription[]> {
-  const response = await apiClient.get<Subscription[]>('/subscription/my/history');
+export async function getRestaurantSubscriptionHistory(restaurantId: number): Promise<Subscription[]> {
+  const response = await apiClient.get<Subscription[]>(`/subscription/restaurant/${restaurantId}/history`);
   return response.data;
 }
 
-export async function subscribe(planId: number, billingCycle: string, receiptUrl: string, notes?: string): Promise<Subscription> {
-  const response = await apiClient.post<Subscription>('/subscription/subscribe', {
+export async function subscribeRestaurant(
+  restaurantId: number,
+  planId: number,
+  billingCycle: string,
+  receiptUrl: string,
+  notes?: string
+): Promise<Subscription> {
+  const response = await apiClient.post<Subscription>(`/subscription/restaurant/${restaurantId}/subscribe`, {
     planId,
     billingCycle,
     receiptUrl,

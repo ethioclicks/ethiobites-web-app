@@ -1,179 +1,137 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useRouter, useParams } from 'next/navigation';
-import { uploadReceiptImage } from '@/lib/supabase';
 import Header from '@/components/layout/Header';
 import Container from '@/components/layout/Container';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import Loading from '@/components/ui/Loading';
-import { 
-  getActivePlans, 
-  getMySubscription, 
-  getMySubscriptionHistory,
-  subscribe, 
-  Plan, 
-  Subscription 
+import { getRestaurantByPublicId, getRestaurant } from '@/lib/api/restaurant';
+import {
+  getActivePlans,
+  getRestaurantSubscription,
+  getRestaurantSubscriptionHistory,
+  subscribeRestaurant,
+  Plan,
+  PlanPricing,
+  Subscription,
 } from '@/lib/api/subscription';
-import { getRestaurantByPublicId } from '@/lib/api/restaurant';
+import { uploadFileToSupabase } from '@/lib/supabase';
 import { Restaurant } from '@/types/restaurant';
 
-const BILLING_CYCLES = [
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Quarterly (3 months)' },
-  { value: 'SEMI_YEARLY', label: 'Semi-Yearly (6 months)' },
-  { value: 'YEARLY', label: 'Yearly (12 months)' },
-];
-
 export default function ManageSubscriptionPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const [currentSubscription, setCurrentSubscription] = useState<Subscription | null>(null);
-  const [subscriptionHistory, setSubscriptionHistory] = useState<Subscription[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [selectedCycle, setSelectedCycle] = useState('MONTHLY');
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptUrl, setReceiptUrl] = useState('');
-  const [notes, setNotes] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const restaurantId = params.restaurantId as string;
+
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [activeSubscription, setActiveSubscription] = useState<Subscription | null>(null);
+  const [history, setHistory] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Subscribe form state
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<string>('MONTHLY');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState('');
+  const [showSubscribeForm, setShowSubscribeForm] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/auth/login?callbackUrl=' + encodeURIComponent(`/subscription/manage/${restaurantId}`));
+      router.push('/auth/login');
     }
-    if (status === 'authenticated' && session && restaurantId) {
+    if (status === 'authenticated' && session) {
       if (session.accessToken) localStorage.setItem('token', session.accessToken);
       if (session.user?.pid) localStorage.setItem('pid', session.user.pid);
       loadData();
     }
-  }, [status, session, restaurantId]);
+  }, [status, session]);
 
   const loadData = async () => {
     try {
-      setIsLoading(true);
-      setError('');
-      
-      const [plansData, subData, historyData, restaurantData] = await Promise.all([
-        getActivePlans(),
-        getMySubscription(),
-        getMySubscriptionHistory(),
-        getRestaurantByPublicId(restaurantId)
-      ]);
-      
-      setPlans(plansData);
-      setCurrentSubscription(subData);
-      setSubscriptionHistory(historyData);
+      setLoading(true);
+      setError(null);
+
+      // Determine if restaurantId is a numeric ID or a UUID
+      let restaurantData: Restaurant;
+      if (/^\d+$/.test(restaurantId)) {
+        restaurantData = await getRestaurant(parseInt(restaurantId));
+      } else {
+        restaurantData = await getRestaurantByPublicId(restaurantId);
+      }
       setRestaurant(restaurantData);
+
+      if (restaurantData.id) {
+        const [plansData, subscriptionData, historyData] = await Promise.all([
+          getActivePlans(),
+          getRestaurantSubscription(restaurantData.id).catch(() => null),
+          getRestaurantSubscriptionHistory(restaurantData.id).catch(() => []),
+        ]);
+        setPlans(plansData);
+        setActiveSubscription(subscriptionData);
+        setHistory(historyData);
+      }
     } catch (err: any) {
-      console.error('Error loading data:', err);
       setError(err.message || 'Failed to load data');
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!file) return null;
-    
-    try {
-      setIsUploading(true);
-      setError('');
-      
-      // Upload using Supabase (consistent with mobile app)
-      const downloadURL = await uploadReceiptImage(file, restaurantId);
-      
-      return downloadURL;
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      setError(error.message || 'Failed to upload file');
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    setReceiptFile(file);
-    const uploadedUrl = await handleFileUpload(file);
-    if (uploadedUrl) {
-      setReceiptUrl(uploadedUrl);
-      setSuccess('Receipt uploaded successfully!');
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
+      setLoading(false);
     }
   };
 
   const handleSubscribe = async () => {
-    if (!selectedPlan?.id) {
-      setError('Please select a plan');
-      return;
-    }
-    
-    if (!receiptUrl) {
-      setError('Please upload your payment receipt');
-      return;
-    }
-    
+    if (!selectedPlan || !receiptFile || !restaurant?.id) return;
+
     try {
-      setIsSubmitting(true);
-      setError('');
-      
-      await subscribe(selectedPlan.id, selectedCycle, receiptUrl, notes);
-      setSuccess('Subscription request submitted successfully! We will review your payment and activate your plan within 24 hours.');
-      
-      // Reload data to show updated subscription
-      loadData();
-      
-      // Reset form
+      setSubscribing(true);
+      setError(null);
+      setSuccess(null);
+
+      // Upload receipt image
+      const receiptUrl = await uploadFileToSupabase(
+        receiptFile,
+        'ethio-bites',
+        `subscription-receipts/${restaurant.restaurantPublicId || restaurant.id}`
+      );
+
+      // Submit subscription
+      await subscribeRestaurant(
+        restaurant.id,
+        selectedPlan.id!,
+        selectedBillingCycle,
+        receiptUrl,
+        notes || undefined
+      );
+
+      setSuccess('Subscription request submitted! It will be activated once payment is approved by admin.');
+      setShowSubscribeForm(false);
       setSelectedPlan(null);
       setReceiptFile(null);
-      setReceiptUrl('');
       setNotes('');
-      
+
+      // Reload data
+      await loadData();
     } catch (err: any) {
-      console.error('Subscription error:', err);
-      setError(err.message || 'Failed to submit subscription request');
+      setError(err.message || 'Subscription failed');
     } finally {
-      setIsSubmitting(false);
+      setSubscribing(false);
     }
   };
 
-  const getPrice = (plan: Plan, cycle: string) => {
-    const pricing = plan.pricings?.find(p => p.billingCycle === cycle);
-    return pricing ? `${pricing.price} ${pricing.currency}` : 'Contact us for pricing';
+  const getSelectedPricing = (): PlanPricing | undefined => {
+    return selectedPlan?.pricings?.find(p => p.billingCycle === selectedBillingCycle);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'bg-green-100 text-green-700 border-green-200';
-      case 'PENDING':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'EXPIRED':
-        return 'bg-red-100 text-red-700 border-red-200';
-      case 'CANCELLED':
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-      case 'REJECTED':
-        return 'bg-red-100 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
+  const formatBillingCycle = (cycle: string) => {
+    return cycle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || loading) {
     return (
       <>
         <Header />
@@ -186,413 +144,237 @@ export default function ManageSubscriptionPage() {
     );
   }
 
-  if (!restaurant) {
-    return (
-      <>
-        <Header />
-        <Container>
-          <div className="text-center py-12">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Restaurant Not Found</h1>
-            <p className="text-gray-600 mb-6">The restaurant you're trying to access could not be found.</p>
-            <Button onClick={() => router.push('/dashboard')} variant="primary">
-              Back to Dashboard
-            </Button>
-          </div>
-        </Container>
-      </>
-    );
-  }
-
   return (
     <>
       <Header />
       <Container>
-        <div className="max-w-4xl mx-auto py-8">
-          {/* Back Navigation */}
-          <div className="mb-6">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center text-primary-600 hover:text-primary-700 font-medium"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="py-8 max-w-4xl mx-auto">
+          {/* Page Header */}
+          <div className="mb-8">
+            <button onClick={() => router.push('/dashboard')} className="text-sm text-primary-600 hover:text-primary-700 mb-2 inline-flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Back to Dashboard
             </button>
+            <h1 className="text-3xl font-bold text-text-primary mb-2">
+              Subscription — {restaurant?.name}
+            </h1>
+            <p className="text-text-secondary">
+              Manage your restaurant&apos;s subscription plan
+            </p>
           </div>
 
-          {/* Restaurant Info */}
-          <Card className="p-6 mb-8 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-blue-900 mb-2">
-                  Subscription Management
-                </h1>
-                <h2 className="text-xl font-semibold text-blue-700 mb-1">
-                  {restaurant.name}
-                </h2>
-                <p className="text-blue-600 text-sm">
-                  Restaurant ID: {restaurantId}
-                </p>
-                {restaurant.street && restaurant.city && (
-                  <p className="text-blue-600 text-sm">
-                    📍 {restaurant.street}, {restaurant.city}
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  restaurant.restaurantStatus === 'APPROVED' 
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {restaurant.restaurantStatus}
-                </div>
-                {restaurant.subscriptionEndDate && (
-                  <p className="text-blue-600 text-sm mt-2">
-                    Current expires: {new Date(restaurant.subscriptionEndDate).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Status Messages */}
-          {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 mb-6">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                {success}
-              </div>
-            </div>
-          )}
-
+          {/* Messages */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 mb-6">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {error}
-              </div>
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+              {success}
             </div>
           )}
 
-          {/* Current Subscription - Only show if active */}
-          {currentSubscription && currentSubscription.status === 'ACTIVE' && (
-            <Card className="p-6 mb-8 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div className="flex items-center justify-between">
+          {/* Active Subscription Card */}
+          {activeSubscription && (
+            <Card className="p-6 mb-8 border-green-200 bg-green-50">
+              <h2 className="text-xl font-semibold text-green-800 mb-4">Active Subscription</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-green-700 flex items-center">
-                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Current Active Plan
-                  </h3>
-                  <p className="text-green-700 font-bold text-xl">{currentSubscription.plan?.name}</p>
-                  <p className="text-green-600 text-sm">
-                    Billing: {currentSubscription.billingCycle.replace('_', ' ').toLowerCase()}
-                  </p>
-                  {currentSubscription.endDate && (
-                    <p className="text-green-600 text-sm">
-                      Expires: {new Date(currentSubscription.endDate).toLocaleDateString()}
-                    </p>
-                  )}
+                  <p className="text-sm text-green-600">Plan</p>
+                  <p className="font-medium text-green-900">{activeSubscription.plan.name}</p>
                 </div>
-                <div className="text-center">
-                  <div className="bg-green-200 text-green-800 px-4 py-2 rounded-full text-sm font-bold mb-2">
-                    ACTIVE
+                <div>
+                  <p className="text-sm text-green-600">Billing</p>
+                  <p className="font-medium text-green-900">{formatBillingCycle(activeSubscription.billingCycle)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-green-600">Start</p>
+                  <p className="font-medium text-green-900">{activeSubscription.startDate || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-green-600">Expires</p>
+                  <p className="font-medium text-green-900">{activeSubscription.endDate || 'N/A'}</p>
+                </div>
+              </div>
+              {activeSubscription.plan.features && activeSubscription.plan.features.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-green-200">
+                  <p className="text-sm text-green-600 mb-2">Included Features</p>
+                  <div className="flex flex-wrap gap-2">
+                    {activeSubscription.plan.features.map((f, i) => (
+                      <span key={i} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">{f.name}</span>
+                    ))}
                   </div>
-                  <div className="text-green-600 text-xs">
-                    {currentSubscription.endDate && (
-                      <>
-                        {Math.ceil((new Date(currentSubscription.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
-                      </>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Subscribe / Renew Button */}
+          {!showSubscribeForm && (
+            <button
+              onClick={() => setShowSubscribeForm(true)}
+              className="mb-8 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+            >
+              {activeSubscription ? 'Renew / Upgrade' : 'Subscribe Now'}
+            </button>
+          )}
+
+          {/* Subscribe Form */}
+          {showSubscribeForm && (
+            <Card className="p-6 mb-8">
+              <h2 className="text-xl font-semibold text-text-primary mb-6">Choose a Plan</h2>
+
+              {/* Plan Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {plans.map(plan => (
+                  <div
+                    key={plan.id}
+                    onClick={() => {
+                      setSelectedPlan(plan);
+                      // Auto-select first available billing cycle
+                      if (plan.pricings && plan.pricings.length > 0) {
+                        setSelectedBillingCycle(plan.pricings[0].billingCycle);
+                      }
+                    }}
+                    className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${
+                      selectedPlan?.id === plan.id
+                        ? 'border-primary-500 bg-primary-50 shadow-md'
+                        : 'border-gray-200 hover:border-primary-300'
+                    }`}
+                  >
+                    <h3 className="font-semibold text-lg mb-1">{plan.name}</h3>
+                    <p className="text-sm text-gray-600 mb-3">{plan.description}</p>
+                    {plan.features && plan.features.length > 0 && (
+                      <ul className="space-y-1">
+                        {plan.features.map((f, i) => (
+                          <li key={i} className="text-sm text-gray-700 flex items-center">
+                            <svg className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {f.name}
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-                </div>
+                ))}
               </div>
+
+              {/* Billing Cycle Selection */}
+              {selectedPlan && selectedPlan.pricings && selectedPlan.pricings.length > 0 && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {selectedPlan.pricings.map(pricing => (
+                      <button
+                        key={pricing.billingCycle}
+                        type="button"
+                        onClick={() => setSelectedBillingCycle(pricing.billingCycle)}
+                        className={`p-3 border-2 rounded-lg text-center transition-all ${
+                          selectedBillingCycle === pricing.billingCycle
+                            ? 'border-primary-500 bg-primary-50'
+                            : 'border-gray-200 hover:border-primary-300'
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-gray-700">{formatBillingCycle(pricing.billingCycle)}</div>
+                        <div className="text-lg font-bold text-primary-600">{pricing.price} {pricing.currency}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Receipt Upload */}
+              {selectedPlan && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Receipt <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Upload a screenshot of your payment receipt (max 5MB)</p>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedPlan && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Notes (optional)</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    rows={3}
+                    placeholder="Any additional notes for the admin..."
+                  />
+                </div>
+              )}
+
+              {/* Summary & Submit */}
+              {selectedPlan && getSelectedPricing() && (
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Total</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {getSelectedPricing()?.price} {getSelectedPricing()?.currency}
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => { setShowSubscribeForm(false); setSelectedPlan(null); }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSubscribe}
+                      disabled={subscribing || !receiptFile}
+                      className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {subscribing ? 'Processing...' : 'Submit Subscription'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
 
           {/* Subscription History */}
-          <Card className="p-6 mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">My Subscriptions</h3>
-            {subscriptionHistory.length > 0 ? (
-              <div className="space-y-4">
-                {subscriptionHistory.map((subscription) => (
-                  <div
-                    key={subscription.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-1">
-                        <h4 className="font-semibold text-gray-900">
-                          {subscription.plan?.name || 'Unknown Plan'}
-                        </h4>
-                        <span className={`text-xs px-2 py-1 rounded-full border ${getStatusColor(subscription.status)}`}>
-                          {subscription.status}
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <p>
-                          <span className="font-medium">Billing:</span> {subscription.billingCycle.replace('_', ' ')}
-                        </p>
-                        
-                        <div className="flex space-x-6">
-                          {subscription.startDate && (
-                            <p>
-                              <span className="font-medium">Started:</span> {new Date(subscription.startDate).toLocaleDateString()}
-                            </p>
-                          )}
-                          
-                          {subscription.endDate && (
-                            <p>
-                              <span className="font-medium">
-                                {subscription.status === 'ACTIVE' ? 'Expires:' : 'Ended:'}
-                              </span> {new Date(subscription.endDate).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <p className="text-xs text-gray-500">
-                          Created: {new Date(subscription.createdAt).toLocaleDateString()}
+          {history.length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold text-text-primary mb-4">Subscription History</h2>
+              <div className="space-y-3">
+                {history.map(sub => (
+                  <Card key={sub.id} className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-medium">{sub.plan.name} — {formatBillingCycle(sub.billingCycle)}</p>
+                        <p className="text-sm text-gray-500">
+                          {sub.startDate || 'Pending'} → {sub.endDate || 'Pending'}
                         </p>
                       </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        sub.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                        sub.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                        sub.status === 'EXPIRED' ? 'bg-gray-100 text-gray-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {sub.status}
+                      </span>
                     </div>
-                    
-                    <div className="text-right">
-                      {subscription.status === 'ACTIVE' && (
-                        <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
-                          Current Plan
-                        </div>
-                      )}
-                      {subscription.status === 'EXPIRED' && (
-                        <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
-                          Expired
-                        </div>
-                      )}
-                      {subscription.status === 'PENDING' && (
-                        <div className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-medium">
-                          Under Review
-                        </div>
-                      )}
-                      {subscription.status === 'CANCELLED' && (
-                        <div className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                          Cancelled
-                        </div>
-                      )}
-                      {subscription.status === 'REJECTED' && (
-                        <div className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-medium">
-                          Rejected
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m6 0h6m6 0h6M9 16h6m6 0h6m6 0h6M9 20h6m6 0h6m6 0h6" />
-                </svg>
-                <p className="text-sm">No subscription history found.</p>
-                <p className="text-xs text-gray-400 mt-1">Choose a plan below to get started!</p>
-              </div>
-            )}
-          </Card>
-
-          {/* Available Plans */}
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              {currentSubscription ? 'Upgrade/Change Plan' : 'Choose Your Plan'}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {plans.map((plan) => (
-                <Card 
-                  key={plan.id} 
-                  className={`p-6 cursor-pointer transition-all duration-200 ${
-                    selectedPlan?.id === plan.id 
-                      ? 'ring-2 ring-primary-500 border-primary-300 bg-primary-50' 
-                      : 'hover:shadow-lg hover:border-primary-200'
-                  }`}
-                  onClick={() => setSelectedPlan(plan)}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900">{plan.name}</h4>
-                    <input
-                      type="radio"
-                      checked={selectedPlan?.id === plan.id}
-                      onChange={() => setSelectedPlan(plan)}
-                      className="text-primary-600 focus:ring-primary-500"
-                    />
-                  </div>
-                  
-                  <p className="text-gray-600 text-sm mb-4">{plan.description}</p>
-                  
-                  {/* Price Display */}
-                  <div className="mb-4">
-                    {plan.pricings?.[0] && (
-                      <p className="text-2xl font-bold text-primary-600">
-                        {plan.pricings[0].price} 
-                        <span className="text-sm font-normal text-gray-500">
-                          {plan.pricings[0].currency}/{plan.pricings[0].billingCycle.toLowerCase().replace('_', ' ')}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Features */}
-                  <ul className="space-y-1">
-                    {plan.features?.map(feature => (
-                      <li key={feature.id} className="flex items-center text-sm text-gray-600">
-                        <svg className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        {feature.name}
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              ))}
             </div>
-          </div>
-
-          {/* Subscription Form */}
-          {selectedPlan && (
-            <Card className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">
-                Subscribe to {selectedPlan.name}
-              </h3>
-
-              <div className="space-y-6">
-                {/* Billing Cycle */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Billing Cycle
-                  </label>
-                  <select
-                    value={selectedCycle}
-                    onChange={(e) => setSelectedCycle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none"
-                  >
-                    {BILLING_CYCLES.map(cycle => (
-                      <option key={cycle.value} value={cycle.value}>
-                        {cycle.label} - {getPrice(selectedPlan, cycle.value)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Payment Instructions */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-blue-800 mb-2">Payment Instructions:</h4>
-                  <div className="text-blue-700 text-sm space-y-1">
-                    <p>1. Transfer <strong>{getPrice(selectedPlan, selectedCycle)}</strong> to our bank account</p>
-                    <p>2. Take a screenshot or photo of your payment receipt</p>
-                    <p>3. Upload the receipt image below</p>
-                    <p>4. We'll review and activate your subscription within 24 hours</p>
-                  </div>
-                </div>
-
-                {/* Receipt Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Payment Receipt Image *
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
-                    {receiptFile ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-center">
-                          <img
-                            src={URL.createObjectURL(receiptFile)}
-                            alt="Receipt preview"
-                            className="max-w-full max-h-48 rounded-lg shadow-md"
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">{receiptFile.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {(receiptFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setReceiptFile(null);
-                            setReceiptUrl('');
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <div>
-                        <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <div className="mt-4">
-                          <label htmlFor="receipt-upload" className="cursor-pointer">
-                            <span className="mt-2 block text-sm font-medium text-gray-900">
-                              {isUploading ? 'Uploading...' : 'Click to upload receipt image'}
-                            </span>
-                            <span className="mt-1 block text-xs text-gray-500">
-                              PNG, JPG, GIF up to 5MB
-                            </span>
-                          </label>
-                          <input
-                            id="receipt-upload"
-                            type="file"
-                            className="sr-only"
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            disabled={isUploading}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional Notes (Optional)
-                  </label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none resize-none"
-                    placeholder="Any additional information about your payment..."
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <div className="flex space-x-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedPlan(null)}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleSubscribe}
-                    loading={isSubmitting || isUploading}
-                    disabled={!receiptUrl}
-                    className="flex-1"
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Submit Subscription Request'}
-                  </Button>
-                </div>
-              </div>
-            </Card>
           )}
         </div>
       </Container>

@@ -49,7 +49,7 @@ export default function AdminDashboard() {
         <div className="py-8">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-text-primary mb-2">Admin Dashboard</h1>
-            <p className="text-text-secondary">Manage subscriptions, features, plans, and payments</p>
+            <p className="text-text-secondary">Manage restaurants and platform settings</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-text-primary">Manage Features</h3>
-                    <p className="text-sm text-text-secondary">Create & edit features</p>
+                    <p className="text-sm text-text-secondary">Create & edit subscription features</p>
                   </div>
                 </div>
               </Card>

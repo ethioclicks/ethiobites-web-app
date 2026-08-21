@@ -6,260 +6,192 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Container from '@/components/layout/Container';
 import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
 import Loading from '@/components/ui/Loading';
-import Modal from '@/components/ui/Modal';
-import { getAllPayments, approvePayment, rejectPayment, deletePayment, PaymentRequest, PageResponse } from '@/lib/api/subscription';
+import { getAllPayments, approvePayment, rejectPayment, deletePayment, PaymentRequest } from '@/lib/api/subscription';
 
 export default function AdminPaymentsPage() {
-  const [payments, setPayments] = useState<PaymentRequest[]>([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentRequest | null>(null);
-  const [paymentToDelete, setPaymentToDelete] = useState<PaymentRequest | null>(null);
-  const [adminNotes, setAdminNotes] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState('');
-  const [filter, setFilter] = useState<'all' | 'pending'>('pending');
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [payments, setPayments] = useState<PaymentRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState<number | null>(null);
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/auth/login');
     if (status === 'authenticated' && session) {
       if (session.accessToken) localStorage.setItem('token', session.accessToken);
       if (session.user?.pid) localStorage.setItem('pid', session.user.pid);
       loadPayments();
     }
-  }, [status, session, currentPage, filter]);
+    if (status === 'unauthenticated') router.push('/auth/login');
+  }, [status, session]);
 
   const loadPayments = async () => {
     try {
-      setIsLoading(true);
-      const data = await getAllPayments(currentPage, 20);
+      setLoading(true);
+      const data = await getAllPayments(0, 50);
       setPayments(data.content);
-      setTotalPages(data.totalPages);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load payments');
+    } catch (err) {
+      console.error('Failed to load payments:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleApprove = async () => {
-    if (!selectedPayment) return;
+  const handleApprove = async (id: number) => {
     try {
-      await approvePayment(selectedPayment.id, adminNotes);
-      setShowReviewModal(false);
-      setSelectedPayment(null);
-      setAdminNotes('');
-      loadPayments();
+      setProcessing(id);
+      await approvePayment(id);
+      await loadPayments();
     } catch (err: any) {
-      setError(err.message || 'Failed to approve payment');
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedPayment) return;
-    try {
-      await rejectPayment(selectedPayment.id, adminNotes);
-      setShowReviewModal(false);
-      setSelectedPayment(null);
-      setAdminNotes('');
-      loadPayments();
-    } catch (err: any) {
-      setError(err.message || 'Failed to reject payment');
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!paymentToDelete) return;
-    try {
-      setIsDeleting(true);
-      await deletePayment(paymentToDelete.id);
-      setShowDeleteModal(false);
-      setPaymentToDelete(null);
-      loadPayments();
-    } catch (err: any) {
-      // Handle 404 specifically for missing endpoint
-      if (err.response?.status === 404) {
-        setError('Delete functionality not available - backend endpoint missing');
-      } else {
-        setError(err.message || 'Failed to delete payment');
-      }
+      alert(err.message || 'Approval failed');
     } finally {
-      setIsDeleting(false);
+      setProcessing(null);
     }
   };
 
-  const openDeleteConfirm = (payment: PaymentRequest) => {
-    setPaymentToDelete(payment);
-    setShowDeleteModal(true);
-  };
-
-  const openReview = (payment: PaymentRequest) => {
-    setSelectedPayment(payment);
-    setAdminNotes('');
-    setShowReviewModal(true);
-  };
-
-  const statusColor = (s: string) => {
-    switch (s) {
-      case 'PENDING': return 'bg-yellow-100 text-yellow-700';
-      case 'APPROVED': return 'bg-green-100 text-green-700';
-      case 'REJECTED': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
+  const handleReject = async (id: number) => {
+    const notes = prompt('Rejection reason (optional):');
+    try {
+      setProcessing(id);
+      await rejectPayment(id, notes || undefined);
+      await loadPayments();
+    } catch (err: any) {
+      alert(err.message || 'Rejection failed');
+    } finally {
+      setProcessing(null);
     }
   };
 
-  if (status === 'loading' || isLoading) {
-    return (<><Header /><Container><div className="flex justify-center items-center min-h-[400px]"><Loading size="lg" /></div></Container></>);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this payment request? This cannot be undone.')) return;
+    try {
+      await deletePayment(id);
+      await loadPayments();
+    } catch (err: any) {
+      alert(err.message || 'Delete failed');
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const formatBillingCycle = (cycle: string) => {
+    return cycle.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  if (status === 'loading' || loading) {
+    return (
+      <>
+        <Header />
+        <Container>
+          <div className="flex justify-center items-center min-h-[400px]">
+            <Loading size="lg" />
+          </div>
+        </Container>
+      </>
+    );
   }
 
   return (
     <>
       <Header />
       <Container>
-        <div className="max-w-5xl mx-auto py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-text-primary">Payment Approvals</h1>
-              <p className="text-text-secondary">Review and approve subscription payments</p>
-            </div>
+        <div className="py-8 max-w-5xl mx-auto">
+          <div className="mb-6">
+            <button onClick={() => router.push('/admin-dashboard')} className="text-sm text-primary-600 hover:text-primary-700 mb-2 inline-flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Admin
+            </button>
+            <h1 className="text-2xl font-bold text-text-primary">Payment Approvals</h1>
+            <p className="text-text-secondary mt-1">Review and approve restaurant subscription payments</p>
           </div>
 
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-6">{error}</div>}
+          {payments.length === 0 ? (
+            <Card className="p-8 text-center text-gray-500">
+              No payment requests found.
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {payments.map(payment => (
+                <Card key={payment.id} className="p-5">
+                  <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                          payment.status === 'APPROVED' ? 'bg-green-100 text-green-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{payment.status}</span>
+                        <span className="text-sm text-gray-500">{formatDate(payment.createdAt)}</span>
+                      </div>
 
-          <div className="space-y-4">
-            {payments.map((payment) => (
-              <Card key={payment.id} className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-1">
-                      <span className="font-semibold text-text-primary">
-                        {payment.user?.firstName} {payment.user?.lastName}
-                      </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusColor(payment.status)}`}>
-                        {payment.status}
-                      </span>
+                      <p className="font-medium text-text-primary">
+                        {payment.user.firstName} {payment.user.lastName}
+                        <span className="text-gray-400 font-normal ml-1">@{payment.user.userName}</span>
+                      </p>
+
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-medium">Restaurant:</span> {payment.subscription.restaurant.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Plan:</span> {payment.subscription.plan.name} ({formatBillingCycle(payment.subscription.billingCycle)})
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Amount:</span> <span className="text-primary-600 font-semibold">{payment.amount} {payment.currency}</span>
+                      </p>
+
+                      {payment.notes && (
+                        <p className="text-sm text-gray-500 italic mt-2">Note: {payment.notes}</p>
+                      )}
+                      {payment.adminNotes && (
+                        <p className="text-sm text-blue-600 mt-1">Admin: {payment.adminNotes}</p>
+                      )}
+
+                      {payment.receiptUrl && (
+                        <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
+                          View Receipt →
+                        </a>
+                      )}
                     </div>
-                    <p className="text-sm text-text-secondary">
-                      Plan: {payment.subscription?.plan?.name} | {payment.subscription?.billingCycle?.replace('_', ' ')} | {payment.amount} {payment.currency}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Submitted: {new Date(payment.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
-                      <Button variant="outline" size="sm">View Receipt</Button>
-                    </a>
-                    {payment.status === 'PENDING' && (
-                      <Button variant="primary" size="sm" onClick={() => openReview(payment)}>Review</Button>
-                    )}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => openDeleteConfirm(payment)}
-                      className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-            {payments.length === 0 && <div className="text-center py-12 text-text-secondary">No payments to review.</div>}
-          </div>
 
-          {totalPages > 1 && (
-            <div className="flex justify-center space-x-2 mt-8">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0}>Previous</Button>
-              <span className="text-sm text-text-secondary py-2">Page {currentPage + 1} of {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))} disabled={currentPage >= totalPages - 1}>Next</Button>
+                    <div className="flex items-center gap-2">
+                      {payment.status === 'PENDING' && (
+                        <>
+                          <button
+                            onClick={() => handleApprove(payment.id)}
+                            disabled={processing === payment.id}
+                            className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            {processing === payment.id ? '...' : 'Approve'}
+                          </button>
+                          <button
+                            onClick={() => handleReject(payment.id)}
+                            disabled={processing === payment.id}
+                            className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDelete(payment.id)}
+                        className="text-gray-400 hover:text-red-600 p-1 transition-colors"
+                        title="Delete"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
         </div>
-
-        <Modal isOpen={showReviewModal} onClose={() => setShowReviewModal(false)} title="Review Payment">
-          {selectedPayment && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <p><strong>User:</strong> {selectedPayment.user?.firstName} {selectedPayment.user?.lastName}</p>
-                <p><strong>Plan:</strong> {selectedPayment.subscription?.plan?.name}</p>
-                <p><strong>Cycle:</strong> {selectedPayment.subscription?.billingCycle?.replace('_', ' ')}</p>
-                <p><strong>Amount:</strong> {selectedPayment.amount} {selectedPayment.currency}</p>
-                {selectedPayment.notes && <p><strong>User Notes:</strong> {selectedPayment.notes}</p>}
-                <a href={selectedPayment.receiptUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline text-sm">View Receipt Image</a>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-1">Admin Notes (optional)</label>
-                <textarea
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:border-primary-500 outline-none resize-none"
-                  rows={3}
-                  placeholder="Add notes about this decision..."
-                />
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <Button variant="ghost" onClick={handleReject} className="flex-1 text-red-600 border-red-200 hover:bg-red-50">Reject</Button>
-                <Button variant="primary" onClick={handleApprove} className="flex-1">Approve</Button>
-              </div>
-            </div>
-          )}
-        </Modal>
-
-        <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Payment">
-          {paymentToDelete && (
-            <div className="space-y-4">
-              <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                <div className="flex items-center space-x-3">
-                  <div className="flex-shrink-0">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-red-800">Delete Payment Record</h3>
-                    <p className="text-sm text-red-700 mt-1">This action cannot be undone. The payment record will be permanently deleted.</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <p><strong>User:</strong> {paymentToDelete.user?.firstName} {paymentToDelete.user?.lastName}</p>
-                <p><strong>Plan:</strong> {paymentToDelete.subscription?.plan?.name}</p>
-                <p><strong>Amount:</strong> {paymentToDelete.amount} {paymentToDelete.currency}</p>
-                <p><strong>Status:</strong> {paymentToDelete.status}</p>
-                <p><strong>Submitted:</strong> {new Date(paymentToDelete.createdAt).toLocaleDateString()}</p>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1"
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={handleDelete}
-                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                  loading={isDeleting}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Payment'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </Modal>
       </Container>
     </>
   );
