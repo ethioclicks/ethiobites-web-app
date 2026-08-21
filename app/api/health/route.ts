@@ -5,7 +5,7 @@ export async function GET() {
     { 
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      service: 'ethobites-web-app'
+      service: 'ethiobites-web-app'
     },
     { status: 200 }
   );

@@ -21,7 +21,7 @@ export default function HomePage() {
           <div className="relative py-24 text-center">
             {/* Logo/Brand */}
             <h1 className="text-5xl font-heading font-bold gradient-text mb-6">
-              EthoBites
+              EthioBites
             </h1>
             
             {/* Tagline */}

@@ -15,8 +15,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'EthoBites - Your Gateway to Ethiopian Excellence',
-  description: 'Connect, discover, and grow with EthoBites - the premier platform for Ethiopian businesses and communities.',
+  title: 'EthioBites - Your Gateway to Ethiopian Excellence',
+  description: 'Connect, discover, and grow with EthioBites - the premier platform for Ethiopian businesses and communities.',
   keywords: 'Ethiopia, business, community, marketplace, networking',
 };
 

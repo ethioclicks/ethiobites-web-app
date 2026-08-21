@@ -16,7 +16,7 @@ const Footer: React.FC = () => {
                   <span className="text-white font-bold text-lg">E</span>
                 </div>
                 <span className="text-xl font-heading font-bold text-white">
-                  EthoBites
+                  EthioBites
                 </span>
               </div>
               <p className="text-gray-300 text-sm">
@@ -136,7 +136,7 @@ const Footer: React.FC = () => {
 
         {/* Copyright */}
         <div className="py-4 border-t border-gray-700 text-center text-sm text-gray-400">
-          <p>&copy; {currentYear} EthoBites. All rights reserved.</p>
+          <p>&copy; {currentYear} EthioBites. All rights reserved.</p>
         </div>
       </Container>
     </footer>

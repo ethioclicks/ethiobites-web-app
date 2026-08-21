@@ -36,7 +36,7 @@ const Header: React.FC<HeaderProps> = ({ variant = 'default', showAuth = true })
               <span className="text-white font-bold text-lg">E</span>
             </div>
             <span className="text-xl font-heading font-bold gradient-text">
-              EthoBites
+              EthioBites
             </span>
           </Link>
 
