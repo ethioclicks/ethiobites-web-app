@@ -6,7 +6,7 @@ import { AuthenticationRequest } from '@/types/user';
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'EthioBites Login',
+      name: 'EthioBite Login',
       credentials: {
         username: { 
           label: 'Phone Number', 
