@@ -53,18 +53,18 @@ export default function RestaurantCard({
     return restaurant.phone || restaurant.phoneNumber || null;
   };
 
-  // Get restaurant status
+  // Get restaurant status — aligned with backend RestaurantStatus enum: ALL, APPROVED, NOT_APPROVED, EXPIRED
   const getRestaurantStatus = () => {
-    const isApproved = restaurant.restaurantStatus === 'APPROVED' || restaurant.isApproved;
+    const status = restaurant.restaurantStatus;
     
-    if (isApproved && restaurant.isActive) {
-      return { text: 'Active', color: 'bg-green-100 text-green-700' };
-    } else if (isApproved && !restaurant.isActive) {
-      return { text: 'Inactive', color: 'bg-yellow-100 text-yellow-700' };
-    } else if (!isApproved) {
-      return { text: 'Pending Approval', color: 'bg-gray-100 text-gray-700' };
+    if (status === 'APPROVED') {
+      return { text: 'Approved', color: 'bg-green-100 text-green-700' };
+    } else if (status === 'NOT_APPROVED') {
+      return { text: 'Not Approved', color: 'bg-yellow-100 text-yellow-700' };
+    } else if (status === 'EXPIRED') {
+      return { text: 'Expired', color: 'bg-orange-100 text-orange-700' };
     }
-    return { text: 'Inactive', color: 'bg-red-100 text-red-700' };
+    return { text: 'Not Approved', color: 'bg-gray-100 text-gray-700' };
   };
 
   const restaurantStatus = getRestaurantStatus();

@@ -12,7 +12,7 @@ export interface Feature {
 
 export interface PlanPricing {
   id?: number;
-  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'SEMI_YEARLY' | 'YEARLY';
+  billingCycle: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMI_YEARLY' | 'YEARLY';
   price: number;
   currency: string;
 }

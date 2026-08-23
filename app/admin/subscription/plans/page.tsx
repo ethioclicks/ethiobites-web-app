@@ -44,7 +44,7 @@ export default function AdminPlansPage() {
     try {
       setLoading(true);
       const [plansData, featuresData] = await Promise.all([getAdminPlans(), getFeatures()]);
-      setPlans(plansData);
+      setPlans(plansData.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
       setFeatures(featuresData);
     } catch (err) {
       console.error('Failed to load data:', err);
@@ -240,6 +240,7 @@ export default function AdminPlansPage() {
                   onChange={e => setPricingForm({...pricingForm, billingCycle: e.target.value})}
                   className="border border-gray-300 rounded-lg p-2 text-sm"
                 >
+                  <option value="WEEKLY">Weekly</option>
                   <option value="MONTHLY">Monthly</option>
                   <option value="QUARTERLY">Quarterly</option>
                   <option value="SEMI_YEARLY">Semi-Yearly</option>
