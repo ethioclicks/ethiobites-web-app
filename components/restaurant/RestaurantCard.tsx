@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Restaurant } from '@/types/restaurant';
 import Card from '@/components/ui/Card';
+import MenuQrCode from '@/components/qr/MenuQrCode';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -198,6 +199,12 @@ export default function RestaurantCard({
             >
               Manage Subscription
             </a>
+
+            <MenuQrCode
+              restaurantPublicId={restaurant.restaurantPublicId}
+              restaurantName={restaurant.name}
+              logoUrl={restaurant.logoUrl}
+            />
 
             {/* Quick stats for owners */}
             <div className="flex justify-between items-center pt-2 text-xs text-gray-500 border-t">
