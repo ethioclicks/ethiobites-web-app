@@ -109,8 +109,14 @@ export default function PublicMenuView({ publicId }: PublicMenuViewProps) {
     : activeFoods.length === 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
-      <RestaurantHeader restaurant={state.data} />
+    <div className="min-h-screen bg-[#0B1220] pb-16">
+      <RestaurantHeader
+        restaurant={state.data}
+        lang={lang}
+        onLangToggle={() => setLang((l) => (l === 'en' ? 'am' : 'en'))}
+      />
+
+      <MenuControls search={search} onSearchChange={setSearch} lang={lang} />
 
       <CategoryTabs
         menus={categories}
@@ -123,18 +129,11 @@ export default function PublicMenuView({ publicId }: PublicMenuViewProps) {
         }}
       />
 
-      <MenuControls
-        search={search}
-        onSearchChange={setSearch}
-        lang={lang}
-        onLangToggle={() => setLang((l) => (l === 'en' ? 'am' : 'en'))}
-      />
-
-      <main className="mx-auto max-w-5xl px-4">
+      <main className="mx-auto max-w-5xl px-4 pt-5">
         {showEmpty ? (
           <EmptyResults lang={lang} />
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
             {isDrinksActive
               ? activeDrinks.map((drink) => (
                   <DrinkCard

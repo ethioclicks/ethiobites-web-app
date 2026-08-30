@@ -11,9 +11,16 @@ interface CategoryTabsProps {
   onSelect: (id: CategoryId) => void;
 }
 
+function tabClass(active: boolean): string {
+  return active
+    ? 'rounded-full bg-accent-orange px-5 py-2 text-sm font-bold uppercase tracking-wide text-white shadow'
+    : 'rounded-full px-3 py-2 text-sm font-semibold text-gray-400 transition hover:text-gray-200';
+}
+
 /**
- * One tab per menu with foods, plus an appended Drinks tab when drinks exist
- * (Req 4.1, 4.2, 4.4, 6.1, 6.2).
+ * Dark-theme category tabs: active tab is an orange filled uppercase pill,
+ * inactive tabs are muted text. One tab per menu with foods, plus an appended
+ * Drinks tab when drinks exist (Req 4.1, 4.2, 4.4, 6.1, 6.2).
  */
 export default function CategoryTabs({
   menus,
@@ -25,34 +32,23 @@ export default function CategoryTabs({
   const t = translations[lang];
 
   return (
-    <nav className="sticky top-0 z-10 border-b border-gray-100 bg-white">
-      <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4 py-2">
-        {menus.map((menu) => {
-          const active = menu.id === activeCategoryId;
-          return (
-            <button
-              key={menu.id}
-              type="button"
-              onClick={() => onSelect(menu.id)}
-              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                active
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {menu.name}
-            </button>
-          );
-        })}
+    <nav className="mt-4 border-b border-white/5">
+      <div className="mx-auto flex max-w-5xl items-center gap-1 overflow-x-auto px-4 py-3">
+        {menus.map((menu) => (
+          <button
+            key={menu.id}
+            type="button"
+            onClick={() => onSelect(menu.id)}
+            className={`${tabClass(menu.id === activeCategoryId)} whitespace-nowrap`}
+          >
+            {menu.name}
+          </button>
+        ))}
         {hasDrinks && (
           <button
             type="button"
             onClick={() => onSelect('drinks')}
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition ${
-              activeCategoryId === 'drinks'
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`${tabClass(activeCategoryId === 'drinks')} whitespace-nowrap`}
           >
             {t.drinksTab}
           </button>

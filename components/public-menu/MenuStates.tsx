@@ -11,8 +11,8 @@ interface StateProps {
 export function LoadingState({ lang = 'en' }: StateProps) {
   const t = translations[lang];
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-gray-500">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primary-600" />
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0B1220] text-gray-300">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/10 border-t-accent-orange" />
       <p>{t.loadingText}</p>
     </div>
   );
@@ -24,9 +24,9 @@ export function LoadingState({ lang = 'en' }: StateProps) {
 export function InvalidState({ lang = 'en' }: StateProps) {
   const t = translations[lang];
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-lg font-semibold text-gray-900">{t.invalidTitle}</h1>
-      <p className="text-sm text-gray-500">{t.invalidMessage}</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-[#0B1220] px-6 text-center">
+      <h1 className="text-lg font-semibold text-white">{t.invalidTitle}</h1>
+      <p className="text-sm text-gray-400">{t.invalidMessage}</p>
     </div>
   );
 }
@@ -37,9 +37,9 @@ export function InvalidState({ lang = 'en' }: StateProps) {
 export function UnreachableState({ lang = 'en' }: StateProps) {
   const t = translations[lang];
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-6 text-center">
-      <h1 className="text-lg font-semibold text-gray-900">{t.errorTitle}</h1>
-      <p className="text-sm text-gray-500">{t.errorMessage}</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-[#0B1220] px-6 text-center">
+      <h1 className="text-lg font-semibold text-white">{t.errorTitle}</h1>
+      <p className="text-sm text-gray-400">{t.errorMessage}</p>
     </div>
   );
 }
@@ -50,9 +50,9 @@ export function UnreachableState({ lang = 'en' }: StateProps) {
 export function EmptyResults({ lang = 'en' }: StateProps) {
   const t = translations[lang];
   return (
-    <div className="flex flex-col items-center justify-center gap-1 py-16 text-center">
-      <p className="font-medium text-gray-900">{t.emptyTitle}</p>
-      <p className="text-sm text-gray-500">{t.emptyDesc}</p>
+    <div className="flex flex-col items-center justify-center gap-1 py-20 text-center">
+      <p className="font-medium text-white">{t.emptyTitle}</p>
+      <p className="text-sm text-gray-400">{t.emptyDesc}</p>
     </div>
   );
 }
