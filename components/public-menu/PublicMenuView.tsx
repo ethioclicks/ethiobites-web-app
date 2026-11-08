@@ -25,6 +25,7 @@ import MenuControls from './MenuControls';
 import FoodCard from './FoodCard';
 import DrinkCard from './DrinkCard';
 import DetailModal, { type DetailItem } from './DetailModal';
+import RestaurantAbout from './RestaurantAbout';
 import {
   EmptyResults,
   InvalidState,
@@ -159,6 +160,8 @@ export default function PublicMenuView({ publicId }: PublicMenuViewProps) {
         lang={lang}
         onClose={() => setSelected(null)}
       />
+
+      <RestaurantAbout restaurant={state.data} lang={lang} />
     </div>
   );
 }
